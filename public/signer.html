@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sign Message</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    input { width: 80%; padding: 8px; margin-bottom: 10px; }
+    button { padding: 8px 12px; }
+    #signature { margin-top: 10px; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h2>Sign Your Bot Message</h2>
+  <p>Challenge message (auto-filled from URL):</p>
+  <input type="text" id="msg" readonly>
+  <br>
+  <button onclick="sign()">Sign Message</button>
+  <p id="signature"></p>
+
+  <script>
+    // Read challenge from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const challenge = urlParams.get("challenge") || "";
+    document.getElementById("msg").value = challenge;
+
+    async function sign() {
+      if (!window.ethereum) return alert("MetaMask not detected");
+      const [account] = await ethereum.request({ method: "eth_requestAccounts" });
+      const msg = document.getElementById("msg").value;
+      try {
+        const sig = await ethereum.request({
+          method: "personal_sign",
+          params: [msg, account]
+        });
+        document.getElementById("signature").innerText = sig;
+      } catch(e) {
+        alert(e.message);
+      }
+    }
+  </script>
+</body>
+</html>
