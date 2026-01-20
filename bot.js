@@ -1,8 +1,10 @@
 require("dotenv").config();
+const express = require("express");
 const { Client, GatewayIntentBits, REST, Routes, PermissionsBitField, ChannelType, SlashCommandBuilder } = require("discord.js");
 const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
 const { ethers } = require("ethers");
 
+// ================== CONFIG ==================
 const TOKEN = process.env.BOT_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
@@ -15,13 +17,20 @@ if (!TOKEN || !CLIENT_ID || !GUILD_ID || !API_KEY) {
 
 const API_URL = "http://manifest.human.tech/api/covenant/signers-export";
 
+// ================== DUMMY HTTP SERVER ==================
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get("/", (req, res) => res.send("Bot running"));
+app.listen(PORT, () => console.log(`Dummy server running on port ${PORT}`));
+
+// ================== DISCORD CLIENT ==================
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
 
 const challenges = new Map();
 
-// ---------------- REGISTER COMMANDS ----------------
+// ---------------- REGISTER SLASH COMMANDS ----------------
 (async () => {
   const commands = [
     new SlashCommandBuilder()
@@ -49,7 +58,7 @@ async function fetchWhitelist() {
   return json.signers || [];
 }
 
-// ---------------- EVENTS ----------------
+// ---------------- CLIENT EVENTS ----------------
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
@@ -138,4 +147,5 @@ Then submit:
   }
 });
 
+// ---------------- LOGIN ----------------
 client.login(TOKEN);
