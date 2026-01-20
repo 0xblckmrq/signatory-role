@@ -30,7 +30,10 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
 
+// ========== COOLDOWN & CHALLENGES ==========
 const challenges = new Map();
+const cooldowns = new Map();
+const COOLDOWN_SECONDS = 300; // 5 minutes
 
 // ---------------- REGISTER SLASH COMMANDS ----------------
 (async () => {
@@ -77,6 +80,16 @@ client.on("interactionCreate", async interaction => {
   // ---------- /verify ----------
   if (interaction.commandName === "verify") {
     const wallet = interaction.options.getString("wallet").toLowerCase();
+    const userId = interaction.user.id;
+
+    // Check cooldown
+    const last = cooldowns.get(userId) || 0;
+    const now = Date.now();
+    if (now - last < COOLDOWN_SECONDS * 1000) {
+      const remaining = Math.ceil((COOLDOWN_SECONDS * 1000 - (now - last)) / 1000);
+      return interaction.reply({ content: `⏳ You can use /verify again in ${remaining} seconds.`, ephemeral: true });
+    }
+    cooldowns.set(userId, now);
 
     // Check whitelist
     const list = await fetchWhitelist();
@@ -101,15 +114,16 @@ client.on("interactionCreate", async interaction => {
         ]
       });
 
-      // Create unique challenge
+      // Generate challenge
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
+      // Correct signer URL
       const signerUrl = `https://${process.env.RENDER_EXTERNAL_URL}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
+      // Send instructions in private channel (no success message yet)
       await channel.send(`
-1️⃣ Start verification
-This private channel is for you (not a DM).
+1️⃣ **Wallet Verification**
 
 🔗 Click the signer page link:
 ${signerUrl}
@@ -117,20 +131,12 @@ ${signerUrl}
 Connect your wallet and sign the message.
 
 Submit your signature here:
-\`\`\`
 /signature <paste_your_signature_here>
-\`\`\`
-
-6️⃣ Verified!
-You will get the **Human ID Verified** role and the channel auto-deletes.
-
-🔒 Privacy & Safety
-- Only you and the bot see this channel
-- No transactions, no gas, no funds touched
-- Ticket deletes automatically after verification or inactivity
       `);
 
-      await interaction.reply({ content: `Private verification channel created: ${channel}`, ephemeral: true });
+      // Ephemeral reply
+      await interaction.reply({ content: `✅ Your private verification channel has been opened: ${channel}`, ephemeral: true });
+
     } catch (err) {
       console.error(err);
       interaction.reply({ content: "❌ Failed to create channel.", ephemeral: true });
@@ -155,11 +161,14 @@ You will get the **Human ID Verified** role and the channel auto-deletes.
       const role = interaction.guild.roles.cache.find(r => r.name === "Human ID Verified");
       if (role) await interaction.member.roles.add(role);
 
-      await interaction.reply("✅ Verified! Role assigned.");
+      await interaction.reply({ content: "✅ Verified! Role assigned.", ephemeral: true });
+
+      // Clean up
       challenges.delete(interaction.user.id);
 
       // Auto-delete channel after 5s
       setTimeout(() => interaction.channel.delete(), 5000);
+
     } catch (err) {
       console.error(err);
       interaction.reply({ content: "❌ Invalid signature.", ephemeral: true });
