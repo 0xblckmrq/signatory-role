@@ -69,7 +69,7 @@ async function fetchWhitelist() {
 }
 
 // ---------------- CLIENT EVENTS ----------------
-client.once("ready", () => console.log(`Logged in as ${client.user.tag}`));
+client.once("clientReady", () => console.log(`Logged in as ${client.user.tag}`));
 
 client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
@@ -91,15 +91,21 @@ client.on("interactionCreate", async interaction => {
     }
     cooldowns.set(userId, now);
 
-    // Check whitelist
+    // Fetch whitelist
     const list = await fetchWhitelist();
-    const approved = list.find(w =>
-      w.walletAddress?.toLowerCase() === wallet &&
-      w.covenantStatus?.toUpperCase() === "SIGNED"
-    );
+    const entry = list.find(w => w.walletAddress?.toLowerCase() === wallet);
 
-    if (!approved) {
-      return interaction.reply({ content: "❌ Wallet not approved for verification.", ephemeral: true });
+    if (!entry) {
+      return interaction.reply({ content: "❌ Wallet not found in whitelist.", ephemeral: true });
+    }
+
+    // Must be SIGNED and VERIFIED
+    if (entry.covenantStatus?.toUpperCase() !== "SIGNED") {
+      return interaction.reply({ content: "❌ Wallet has not signed the covenant yet. Cannot proceed.", ephemeral: true });
+    }
+
+    if (entry.humanityStatus?.toUpperCase() !== "VERIFIED") {
+      return interaction.reply({ content: "❌ Wallet has not been verified for humanity. Cannot proceed.", ephemeral: true });
     }
 
     try {
@@ -119,9 +125,11 @@ client.on("interactionCreate", async interaction => {
       challenges.set(member.id, { challenge, wallet });
 
       // Correct signer URL
-      const signerUrl = `https://${process.env.RENDER_EXTERNAL_URL}/signer.html?challenge=${encodeURIComponent(challenge)}`;
+      let baseUrl = process.env.RENDER_EXTERNAL_URL;
+      if (baseUrl.startsWith("https://")) baseUrl = baseUrl.replace(/^https:\/\//, "");
+      const signerUrl = `https://${baseUrl}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
-      // Send instructions in private channel (no success message yet)
+      // Send instructions in private channel
       await channel.send(`
 1️⃣ **Wallet Verification**
 
@@ -134,7 +142,6 @@ Submit your signature here:
 /signature <paste_your_signature_here>
       `);
 
-      // Ephemeral reply
       await interaction.reply({ content: `✅ Your private verification channel has been opened: ${channel}`, ephemeral: true });
 
     } catch (err) {
