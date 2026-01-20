@@ -7,8 +7,6 @@ const path = require("path");
 
 // ================= CONFIG =================
 const ROLE_NAME = "Human ID Verified";
-const SBT_CONTRACT = "0x2AA822e264F8cc31A2b9C22f39e5551241e94DfB";
-const RPC_URL = "https://mainnet.optimism.io";
 const BASE_API = "http://manifest.human.tech/api/covenant/signers-export";
 const API_KEY = process.env.WHITELIST_API_KEY;
 
@@ -41,10 +39,6 @@ app.listen(3000, () => console.log("API running on port 3000"));
 // ================= STORAGE =================
 const challenges = new Map();
 
-// ================= PROVIDER =================
-const provider = new ethers.JsonRpcProvider(RPC_URL);
-const ABI = ["function balanceOf(address owner) view returns (uint256)"];
-
 // ================= READY =================
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user.tag}`);
@@ -53,7 +47,7 @@ client.once("ready", async () => {
   const commands = [
     new SlashCommandBuilder()
       .setName("verify")
-      .setDescription("Start Human ID SBT verification")
+      .setDescription("Start Human ID wallet verification")
       .toJSON()
   ];
 
@@ -71,7 +65,7 @@ async function fetchWhitelist() {
   try {
     const url = `${BASE_API}?apiKey=${API_KEY}`;
     const res = await fetch(url);
-    const data = await res.json(); // assuming API returns JSON array of wallet addresses
+    const data = await res.json(); // API returns array of wallet addresses
     return data.map(w => w.toLowerCase());
   } catch (err) {
     console.error("Error fetching whitelist:", err);
@@ -82,117 +76,105 @@ async function fetchWhitelist() {
 // ================= INTERACTIONS =================
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
+  if (interaction.commandName !== "verify") return;
 
-  if (interaction.commandName === "verify") {
-    await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ ephemeral: true });
 
-    const user = interaction.user;
-    const guild = interaction.guild;
+  const user = interaction.user;
+  const guild = interaction.guild;
 
-    // Ask for wallet address
-    const filter = m => m.author.id === user.id;
-    await interaction.editReply("Please reply with your wallet address (e.g., `0xABCDEF...`) in this channel.");
+  const filter = m => m.author.id === user.id;
+  await interaction.editReply("Please reply with your wallet address (e.g., `0xABCDEF...`) in this channel.");
 
-    const collector = interaction.channel.createMessageCollector({ filter, time: 5 * 60 * 1000, max: 1 });
+  const collector = interaction.channel.createMessageCollector({ filter, time: 5 * 60 * 1000, max: 1 });
 
-    collector.on("collect", async (message) => {
-      const wallet = message.content.trim().toLowerCase();
+  collector.on("collect", async (message) => {
+    const wallet = message.content.trim().toLowerCase();
 
-      // Fetch whitelist from API
-      const whitelist = await fetchWhitelist();
-      if (!whitelist.includes(wallet)) return message.reply("❌ Wallet not approved for verification.");
+    // Fetch whitelist from API
+    const whitelist = await fetchWhitelist();
+    if (!whitelist.includes(wallet)) return message.reply("❌ Wallet not approved for verification.");
 
-      // Generate challenge
-      const challenge = `Verify Discord ${user.id}-${Date.now()}`;
-      challenges.set(user.id, { challenge, wallet });
+    // Generate challenge
+    const challenge = `Verify Discord ${user.id}-${Date.now()}`;
+    challenges.set(user.id, { challenge, wallet });
 
-      // Create private verification channel
-      try {
-        const channel = await guild.channels.create({
-          name: `verify-${user.username}`,
-          type: ChannelType.GuildText,
-          permissionOverwrites: [
-            { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-            { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-            { id: client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory] },
-          ],
-        });
+    // Create private verification channel
+    try {
+      const channel = await guild.channels.create({
+        name: `verify-${user.username}`,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+          { id: client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory] },
+        ],
+      });
 
-        await channel.send(
-          `✅ **Wallet Verification Started**\n\n` +
-          `Sign this message:\n\`${challenge}\`\n\n` +
-          `Signer page:\nhttps://role-tfws.onrender.com/signer.html?msg=${encodeURIComponent(challenge)}\n\n` +
-          `Then reply:\n\`!signature <your_signature>\``
-        );
+      await channel.send(
+        `✅ **Wallet Verification Started**\n\n` +
+        `Sign this message:\n\`${challenge}\`\n\n` +
+        `Signer page:\nhttps://role-tfws.onrender.com/signer.html?msg=${encodeURIComponent(challenge)}\n\n` +
+        `Then reply:\n\`!signature <your_signature>\``
+      );
 
-        // Auto-delete ticket after 10 minutes
-        setTimeout(() => {
-          if (challenges.has(user.id)) {
-            challenges.delete(user.id);
-            if (channel) channel.delete().catch(() => {});
-          }
-        }, 10 * 60 * 1000);
+      // Auto-delete ticket after 10 minutes
+      setTimeout(() => {
+        if (challenges.has(user.id)) {
+          challenges.delete(user.id);
+          if (channel) channel.delete().catch(() => {});
+        }
+      }, 10 * 60 * 1000);
 
-        message.reply(`✅ Verification ticket created! Check your private channel: ${channel}`);
-      } catch (err) {
-        console.error("CHANNEL ERROR:", err);
-        message.reply("❌ Bot lacks permissions to create verification channel.");
-      }
-    });
+      message.reply(`✅ Verification ticket created! Check your private channel: ${channel}`);
+    } catch (err) {
+      console.error("CHANNEL ERROR:", err);
+      message.reply("❌ Bot lacks permissions to create verification channel.");
+    }
+  });
 
-    collector.on("end", collected => {
-      if (collected.size === 0) interaction.followUp("❌ Verification timed out. Please try again.");
-    });
-  }
+  collector.on("end", collected => {
+    if (collected.size === 0) interaction.followUp("❌ Verification timed out. Please try again.");
+  });
 });
 
 // ================= SIGNATURE HANDLER =================
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
+  if (!message.content.startsWith("!signature")) return;
 
-  if (message.content.startsWith("!signature")) {
-    const args = message.content.split(" ");
-    if (!args[1]) return message.reply("Use: `!signature <signature>`");
+  const args = message.content.split(" ");
+  if (!args[1]) return message.reply("Use: `!signature <signature>`");
 
-    const signature = args[1];
-    const record = challenges.get(message.author.id);
-    if (!record) return message.reply("Run `/verify` first or your challenge expired.");
+  const signature = args[1];
+  const record = challenges.get(message.author.id);
+  if (!record) return message.reply("Run `/verify` first or your challenge expired.");
 
-    let walletRecovered;
-    try {
-      walletRecovered = ethers.verifyMessage(record.challenge, signature);
-    } catch {
-      return message.reply("❌ Invalid signature.");
-    }
-
-    if (walletRecovered.toLowerCase() !== record.wallet) {
-      return message.reply("❌ Signature does not match submitted wallet.");
-    }
-
-    // Optional: on-chain SBT check
-    try {
-      const contract = new ethers.Contract(SBT_CONTRACT, ABI, provider);
-      const balance = await contract.balanceOf(walletRecovered);
-      if (balance === 0n) return message.reply("❌ Wallet does not hold Human ID SBT.");
-    } catch {
-      return message.reply("❌ Error checking SBT on-chain.");
-    }
-
-    // Assign role
-    const role = message.guild.roles.cache.find(r => r.name === ROLE_NAME);
-    if (!role) return message.reply("Role not found.");
-    const member = await message.guild.members.fetch(message.author.id);
-    await member.roles.add(role);
-
-    challenges.delete(message.author.id);
-
-    // Delete ticket channel
-    if (message.channel.name.startsWith("verify-")) {
-      await message.channel.delete().catch(() => {});
-    }
-
-    message.reply(`✅ Verified! Wallet: ${walletRecovered}`);
+  let walletRecovered;
+  try {
+    walletRecovered = ethers.verifyMessage(record.challenge, signature);
+  } catch {
+    return message.reply("❌ Invalid signature.");
   }
+
+  if (walletRecovered.toLowerCase() !== record.wallet) {
+    return message.reply("❌ Signature does not match submitted wallet.");
+  }
+
+  // Assign role
+  const role = message.guild.roles.cache.find(r => r.name === ROLE_NAME);
+  if (!role) return message.reply("Role not found.");
+  const member = await message.guild.members.fetch(message.author.id);
+  await member.roles.add(role);
+
+  challenges.delete(message.author.id);
+
+  // Delete ticket channel
+  if (message.channel.name.startsWith("verify-")) {
+    await message.channel.delete().catch(() => {});
+  }
+
+  message.reply(`✅ Verified! Wallet: ${walletRecovered}`);
 });
 
 // ================= LOGIN =================
