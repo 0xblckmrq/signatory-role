@@ -19,7 +19,6 @@
   <p id="signature"></p>
 
   <script>
-    // Read challenge from URL
     const urlParams = new URLSearchParams(window.location.search);
     const challenge = urlParams.get("challenge") || "";
     document.getElementById("msg").value = challenge;
