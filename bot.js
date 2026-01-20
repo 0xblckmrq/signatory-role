@@ -1,181 +1,141 @@
-// ================= IMPORTS =================
-const { Client, GatewayIntentBits, ChannelType, PermissionFlagsBits, REST, Routes, SlashCommandBuilder } = require("discord.js");
-const fetch = require("node-fetch");
-const express = require("express");
+require("dotenv").config();
+const { Client, GatewayIntentBits, REST, Routes, PermissionsBitField, ChannelType, SlashCommandBuilder } = require("discord.js");
+const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
 const { ethers } = require("ethers");
-const path = require("path");
 
-// ================= CONFIG =================
-const ROLE_NAME = "Human ID Verified";
-const BASE_API = "http://manifest.human.tech/api/covenant/signers-export";
+const TOKEN = process.env.BOT_TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID;
+const GUILD_ID = process.env.GUILD_ID;
 const API_KEY = process.env.WHITELIST_API_KEY;
 
-// ================= TOKEN / IDs =================
-const token = process.env.BOT_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID; // bot application ID
-const GUILD_ID = process.env.GUILD_ID;   // server ID
-
-if (!token || !CLIENT_ID || !GUILD_ID || !API_KEY) {
+if (!TOKEN || !CLIENT_ID || !GUILD_ID || !API_KEY) {
   console.error("BOT_TOKEN, CLIENT_ID, GUILD_ID, or WHITELIST_API_KEY not set");
   process.exit(1);
 }
 
-// ================= CLIENT =================
+const API_URL = "http://manifest.human.tech/api/covenant/signers-export";
+
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers,
-  ],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
 
-// ================= EXPRESS =================
-const app = express();
-app.use(express.static(path.join(__dirname, "public"))); // serve signer.html
-app.get("/", (req, res) => res.send("SBT bot is alive"));
-app.listen(3000, () => console.log("API running on port 3000"));
-
-// ================= STORAGE =================
 const challenges = new Map();
 
-// ================= READY =================
-client.once("ready", async () => {
-  console.log(`Logged in as ${client.user.tag}`);
-
-  // Register /verify slash command
+// ---------------- REGISTER COMMANDS ----------------
+(async () => {
   const commands = [
     new SlashCommandBuilder()
       .setName("verify")
-      .setDescription("Start Human ID wallet verification")
-      .toJSON()
-  ];
+      .setDescription("Start wallet verification"),
+    new SlashCommandBuilder()
+      .setName("signature")
+      .setDescription("Submit your signature")
+      .addStringOption(opt =>
+        opt.setName("value")
+          .setDescription("Paste your signature")
+          .setRequired(true)
+      )
+  ].map(c => c.toJSON());
 
-  const rest = new REST({ version: "10" }).setToken(token);
-  try {
-    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
-    console.log("Slash command /verify registered");
-  } catch (err) {
-    console.error("Error registering slash command:", err);
-  }
-});
+  const rest = new REST({ version: "10" }).setToken(TOKEN);
+  await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+  console.log("Slash commands registered");
+})();
 
-// ================= FETCH WHITELIST =================
+// ---------------- HELPERS ----------------
 async function fetchWhitelist() {
-  try {
-    const url = `${BASE_API}?apiKey=${API_KEY}`;
-    const res = await fetch(url);
-    const data = await res.json(); // API returns array of wallet addresses
-    return data.map(w => w.toLowerCase());
-  } catch (err) {
-    console.error("Error fetching whitelist:", err);
-    return [];
-  }
+  const res = await fetch(`${API_URL}?apiKey=${API_KEY}`);
+  const json = await res.json();
+  return json.signers || [];
 }
 
-// ================= INTERACTIONS =================
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isCommand()) return;
-  if (interaction.commandName !== "verify") return;
+// ---------------- EVENTS ----------------
+client.once("ready", () => {
+  console.log(`Logged in as ${client.user.tag}`);
+});
 
-  await interaction.deferReply({ ephemeral: true });
+client.on("interactionCreate", async interaction => {
+  if (!interaction.isChatInputCommand()) return;
 
-  const user = interaction.user;
-  const guild = interaction.guild;
-
-  const filter = m => m.author.id === user.id;
-  await interaction.editReply("Please reply with your wallet address (e.g., `0xABCDEF...`) in this channel.");
-
-  const collector = interaction.channel.createMessageCollector({ filter, time: 5 * 60 * 1000, max: 1 });
-
-  collector.on("collect", async (message) => {
-    const wallet = message.content.trim().toLowerCase();
-
-    // Fetch whitelist from API
-    const whitelist = await fetchWhitelist();
-    if (!whitelist.includes(wallet)) return message.reply("❌ Wallet not approved for verification.");
-
-    // Generate challenge
-    const challenge = `Verify Discord ${user.id}-${Date.now()}`;
-    challenges.set(user.id, { challenge, wallet });
-
-    // Create private verification channel
+  // ---------- /verify ----------
+  if (interaction.commandName === "verify") {
     try {
+      const guild = interaction.guild;
+      const member = interaction.member;
+
       const channel = await guild.channels.create({
-        name: `verify-${user.username}`,
+        name: `verify-${member.user.username}`,
         type: ChannelType.GuildText,
         permissionOverwrites: [
-          { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-          { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-          { id: client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory] },
-        ],
+          { id: guild.roles.everyone, deny: [PermissionsBitField.Flags.ViewChannel] },
+          { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+        ]
       });
 
-      await channel.send(
-        `✅ **Wallet Verification Started**\n\n` +
-        `Sign this message:\n\`${challenge}\`\n\n` +
-        `Signer page:\nhttps://role-tfws.onrender.com/signer.html?msg=${encodeURIComponent(challenge)}\n\n` +
-        `Then reply:\n\`!signature <your_signature>\``
+      const challenge = `Verify ownership for ${member.id} at ${Date.now()}`;
+      challenges.set(member.id, challenge);
+
+      await channel.send(`
+🔐 **Wallet Verification**
+
+1. Open signer page  
+2. Connect wallet  
+3. Sign the message below  
+
+\`\`\`
+${challenge}
+\`\`\`
+
+Then submit:
+
+\`\`\`
+/signature <your_signature>
+\`\`\`
+      `);
+
+      await interaction.reply({ content: `Private verification channel created: ${channel}`, ephemeral: true });
+    } catch (err) {
+      console.error(err);
+      interaction.reply({ content: "❌ Failed to create channel.", ephemeral: true });
+    }
+  }
+
+  // ---------- /signature ----------
+  if (interaction.commandName === "signature") {
+    const sig = interaction.options.getString("value");
+    const challenge = challenges.get(interaction.user.id);
+
+    if (!challenge) {
+      return interaction.reply({ content: "❌ No active verification.", ephemeral: true });
+    }
+
+    try {
+      const wallet = ethers.verifyMessage(challenge, sig);
+      const list = await fetchWhitelist();
+
+      const approved = list.find(w =>
+        w.walletAddress?.toLowerCase() === wallet.toLowerCase() &&
+        w.covenantStatus?.toUpperCase() === "SIGNED"
       );
 
-      // Auto-delete ticket after 10 minutes
-      setTimeout(() => {
-        if (challenges.has(user.id)) {
-          challenges.delete(user.id);
-          if (channel) channel.delete().catch(() => {});
-        }
-      }, 10 * 60 * 1000);
+      if (!approved) {
+        return interaction.reply({ content: "❌ Wallet not approved for verification.", ephemeral: true });
+      }
 
-      message.reply(`✅ Verification ticket created! Check your private channel: ${channel}`);
+      const role = interaction.guild.roles.cache.find(r => r.name === "Human ID Verified");
+      if (role) await interaction.member.roles.add(role);
+
+      await interaction.reply("✅ Verified! Role assigned.");
+
+      setTimeout(() => interaction.channel.delete(), 5000);
+      challenges.delete(interaction.user.id);
+
     } catch (err) {
-      console.error("CHANNEL ERROR:", err);
-      message.reply("❌ Bot lacks permissions to create verification channel.");
+      console.error(err);
+      interaction.reply({ content: "❌ Invalid signature.", ephemeral: true });
     }
-  });
-
-  collector.on("end", collected => {
-    if (collected.size === 0) interaction.followUp("❌ Verification timed out. Please try again.");
-  });
+  }
 });
 
-// ================= SIGNATURE HANDLER =================
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-  if (!message.content.startsWith("!signature")) return;
-
-  const args = message.content.split(" ");
-  if (!args[1]) return message.reply("Use: `!signature <signature>`");
-
-  const signature = args[1];
-  const record = challenges.get(message.author.id);
-  if (!record) return message.reply("Run `/verify` first or your challenge expired.");
-
-  let walletRecovered;
-  try {
-    walletRecovered = ethers.verifyMessage(record.challenge, signature);
-  } catch {
-    return message.reply("❌ Invalid signature.");
-  }
-
-  if (walletRecovered.toLowerCase() !== record.wallet) {
-    return message.reply("❌ Signature does not match submitted wallet.");
-  }
-
-  // Assign role
-  const role = message.guild.roles.cache.find(r => r.name === ROLE_NAME);
-  if (!role) return message.reply("Role not found.");
-  const member = await message.guild.members.fetch(message.author.id);
-  await member.roles.add(role);
-
-  challenges.delete(message.author.id);
-
-  // Delete ticket channel
-  if (message.channel.name.startsWith("verify-")) {
-    await message.channel.delete().catch(() => {});
-  }
-
-  message.reply(`✅ Verified! Wallet: ${walletRecovered}`);
-});
-
-// ================= LOGIN =================
-client.login(token);
+client.login(TOKEN);
