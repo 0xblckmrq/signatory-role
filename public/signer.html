@@ -5,8 +5,8 @@
   <title>human.tech Covenant Signatory Verification</title>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-    button { padding: 10px 15px; margin-top: 20px; font-size: 16px; }
-    #status { margin-top: 15px; font-weight: bold; }
+    button { padding: 10px 15px; margin-top: 20px; font-size: 16px; cursor: pointer; }
+    #status { margin-top: 15px; font-weight: bold; word-break: break-word; }
   </style>
 </head>
 <body>
@@ -20,6 +20,7 @@
 
   <script type="module">
     import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/esm/index.min.js";
+
     const urlParams = new URLSearchParams(window.location.search);
     const challenge = urlParams.get("challenge") || "";
     const userId = urlParams.get("userId");
@@ -28,24 +29,27 @@
 
     document.getElementById("signBtn").addEventListener("click", async () => {
       const status = document.getElementById("status");
+      status.innerText = "Connecting wallet...";
 
       try {
         let provider;
 
         if (window.ethereum) {
-          // MetaMask
+          // MetaMask (desktop & mobile)
           provider = window.ethereum;
           await provider.request({ method: "eth_requestAccounts" });
         } else {
-          // WalletConnect
-          provider = new WalletConnectProvider({ infuraId: "YOUR_INFURA_ID" }); // replace with your Infura ID
+          // WalletConnect (mobile)
+          provider = new WalletConnectProvider({
+            rpc: { 1: "https://mainnet.infura.io/v3/84842078b09946638c03157f83405213" }
+          });
           await provider.enable();
         }
 
         const accounts = await provider.request({ method: "eth_accounts" });
         const account = accounts[0];
+        status.innerText = `Wallet connected: ${account}\nSigning challenge...`;
 
-        // Sign the challenge
         const signature = await provider.request({
           method: "personal_sign",
           params: [challenge, account]
@@ -53,7 +57,6 @@
 
         status.innerText = "✅ Signature created! Submitting to bot...";
 
-        // Send signature to bot
         const resp = await fetch(`/api/signature`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
