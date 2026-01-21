@@ -2,18 +2,17 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const { Client, GatewayIntentBits, REST, Routes, PermissionsBitField, ChannelType, SlashCommandBuilder } = require("discord.js");
-const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
-const { ethers } = require("ethers");
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
+const { verifyMessage } = require("ethers"); // updated for Ethers v6
 
 // ================== CONFIG ==================
 const TOKEN = process.env.BOT_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const API_KEY = process.env.WHITELIST_API_KEY;
-const INFURA_KEY = process.env.INFURA_KEY;
 
-if (!TOKEN || !CLIENT_ID || !GUILD_ID || !API_KEY || !INFURA_KEY) {
-  console.error("BOT_TOKEN, CLIENT_ID, GUILD_ID, WHITELIST_API_KEY or INFURA_KEY not set");
+if (!TOKEN || !CLIENT_ID || !GUILD_ID || !API_KEY) {
+  console.error("BOT_TOKEN, CLIENT_ID, GUILD_ID, or WHITELIST_API_KEY not set");
   process.exit(1);
 }
 
@@ -23,12 +22,6 @@ const API_URL = "http://manifest.human.tech/api/covenant/signers-export";
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
-
-// Serve config.json dynamically with Infura key
-app.get("/config.json", (req, res) => {
-  res.json({ INFURA_KEY });
-});
-
 app.get("/", (req, res) => res.send("Bot running"));
 app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
 
@@ -141,7 +134,7 @@ client.on("interactionCreate", async interaction => {
 🔗 Click the signer page link:
 ${signerUrl}
 
-Connect your wallet (MetaMask or WalletConnect) and sign the message.
+Connect your wallet and sign the message.
 
 Submit your signature here:
 /signature <paste_your_signature_here>
@@ -164,12 +157,12 @@ Submit your signature here:
 
     try {
       // Recover wallet from signature
-      const recovered = ethers.verifyMessage(data.challenge, sig);
+      const recovered = verifyMessage(data.challenge, sig); // Ethers v6
       if (recovered.toLowerCase() !== data.wallet.toLowerCase()) {
         return interaction.reply({ content: "❌ Signature does not match provided wallet.", ephemeral: true });
       }
 
-      // Assign updated role
+      // Assign role
       const role = interaction.guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
       if (role) await interaction.member.roles.add(role);
 
