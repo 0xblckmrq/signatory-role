@@ -26,29 +26,36 @@ const urlParams = new URLSearchParams(window.location.search);
 const challenge = urlParams.get("challenge");
 const userId = urlParams.get("userId");
 
-document.getElementById("msg").value = challenge;
+const msgInput = document.getElementById("msg");
+const status = document.getElementById("status");
+const btn = document.getElementById("signBtn");
 
-document.getElementById("signBtn").addEventListener("click", async () => {
-  const status = document.getElementById("status");
+btn.addEventListener("click", async () => {
   status.innerText = "Connecting wallet...";
+  let provider;
 
   try {
-    let provider;
-
+    // Desktop MetaMask
     if (window.ethereum) {
       provider = window.ethereum;
       await provider.request({ method: "eth_requestAccounts" });
     } else {
+      // WalletConnect
       provider = new WalletConnectProvider({
         rpc: { 1: "https://mainnet.infura.io/v3/84842078b09946638c03157f83405213" }
       });
       await provider.enable();
     }
 
+    // Get account
     const accounts = await provider.request({ method: "eth_accounts" });
     const account = accounts[0];
     status.innerText = `Wallet connected: ${account}\nSigning challenge...`;
 
+    // Show challenge now (after connection)
+    msgInput.value = challenge;
+
+    // Sign challenge
     const signature = await provider.request({
       method: "personal_sign",
       params: [challenge, account]
@@ -56,6 +63,7 @@ document.getElementById("signBtn").addEventListener("click", async () => {
 
     status.innerText = "✅ Signature created! Submitting to bot...";
 
+    // POST signature to bot
     const resp = await fetch("/api/signature", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
