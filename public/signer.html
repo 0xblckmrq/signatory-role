@@ -2,81 +2,42 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>human.tech Covenant Signatory Verification</title>
+  <title>Sign Message</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin:auto; }
-    button { padding: 10px 15px; margin-top: 20px; font-size: 16px; cursor:pointer; }
-    #status { margin-top: 10px; word-break: break-word; }
-    input { width:100%; padding:8px; margin-top:5px; }
+    body { font-family: sans-serif; padding: 20px; }
+    input { width: 80%; padding: 8px; margin-bottom: 10px; }
+    button { padding: 8px 12px; }
+    #signature { margin-top: 10px; word-break: break-all; }
   </style>
 </head>
 <body>
-  <h2>human.tech Covenant Signatory Verification</h2>
-  <p>Connect your wallet and sign the challenge below.</p>
-  <p>Challenge:</p>
+  <h2>Sign Your Bot Message</h2>
+  <p>Challenge message (auto-filled from URL):</p>
   <input type="text" id="msg" readonly>
   <br>
-  <button id="signBtn">Connect & Sign</button>
-  <p id="status"></p>
+  <button onclick="sign()">Sign Message</button>
+  <p id="signature"></p>
 
-  <script type="module">
-    import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/esm/index.min.js";
-
+  <script>
     const urlParams = new URLSearchParams(window.location.search);
     const challenge = urlParams.get("challenge") || "";
-    const userId = urlParams.get("userId");
+    document.getElementById("msg").value = challenge;
 
-    const msgInput = document.getElementById("msg");
-    const status = document.getElementById("status");
-    const btn = document.getElementById("signBtn");
-
-    msgInput.value = challenge;
-
-    btn.addEventListener("click", async () => {
-      status.innerText = "Connecting wallet...";
-      let provider;
-
+    async function sign() {
+      if (!window.ethereum) return alert("MetaMask not detected");
+      const [account] = await ethereum.request({ method: "eth_requestAccounts" });
+      const msg = document.getElementById("msg").value;
       try {
-        if (window.ethereum) {
-          provider = window.ethereum;
-          await provider.request({ method: "eth_requestAccounts" });
-        } else {
-          provider = new WalletConnectProvider({
-            rpc: { 1: "https://mainnet.infura.io/v3/84842078b09946638c03157f83405213" }
-          });
-          await provider.enable();
-        }
-
-        const accounts = await provider.request({ method: "eth_accounts" });
-        const account = accounts[0];
-        status.innerText = `Wallet connected: ${account}\nSigning challenge...`;
-
-        const signature = await provider.request({
+        const sig = await ethereum.request({
           method: "personal_sign",
-          params: [challenge, account]
+          params: [msg, account]
         });
-
-        status.innerText = "✅ Signed! Submitting to bot...";
-
-        // Send signature automatically to bot
-        const resp = await fetch("/api/signature", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, signature })
-        });
-
-        const result = await resp.json();
-        if (result.success) {
-          status.innerText = "🎉 Verification complete! Role assigned. Private channel will delete shortly.";
-        } else {
-          status.innerText = "❌ Verification failed: " + (result.error || "Unknown error");
-        }
-
-      } catch (err) {
-        console.error(err);
-        status.innerText = "❌ Error: " + err.message;
+        document.getElementById("signature").innerText = sig;
+      } catch(e) {
+        alert(e.message);
       }
-    });
+    }
   </script>
 </body>
 </html>
+
