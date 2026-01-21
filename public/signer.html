@@ -1,8 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>human.tech Covenant Signatory Verification</title>
+
+  <!-- WalletConnect & Ethers -->
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.umd.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f1115;
+      color: #fff;
+      max-width: 520px;
+      margin: auto;
+      padding: 40px;
+    }
+    h2 { margin-bottom: 10px; }
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 6px;
+      border: none;
+      margin-top: 10px;
+    }
+    button {
+      margin-top: 14px;
+      padding: 12px;
+      width: 100%;
+      border-radius: 6px;
+      border: none;
+      background: #4f7cff;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    #status { margin-top: 12px; font-size: 14px; }
+    #signature {
+      word-break: break-all;
+      margin-top: 12px;
+      background: #1b1e26;
+      padding: 10px;
+      border-radius: 6px;
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>🔐 human.tech Covenant Signatory Verification</h2>
+<p>Connect your wallet that you have used to sign the covenant.</p>
+
+<input type="text" id="msg" readonly />
+<button onclick="connectAndSign()">Connect Wallet & Sign</button>
+
+<div id="status"></div>
+<pre id="signature"></pre>
+
+<script>
+async function getInfuraKey() {
+  try {
+    const res = await fetch("/config");
+    const json = await res.json();
+    return json.INFURA_KEY;
+  } catch {
+    return "";
+  }
+}
+
+function getChallengeFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("challenge");
+}
+
+window.onload = async () => {
+  const challenge = getChallengeFromURL();
+  if (challenge) document.getElementById("msg").value = decodeURIComponent(challenge);
+};
+
 async function connectAndSign() {
   const status = document.getElementById("status");
   const sigBox = document.getElementById("signature");
   const challenge = document.getElementById("msg").value;
-
   if (!challenge) return alert("Missing challenge");
 
   status.innerText = "Connecting wallet...";
@@ -10,24 +92,21 @@ async function connectAndSign() {
 
   try {
     let provider;
+    const INFURA_KEY = await getInfuraKey();
 
     if (window.ethereum) {
-      // MetaMask
       await window.ethereum.request({ method: "eth_requestAccounts" });
       provider = new ethers.BrowserProvider(window.ethereum);
     } else {
-      // WalletConnect for mobile
       const wcProvider = new WalletConnectProvider.default({
-        rpc: { 1: `https://mainnet.infura.io/v3/${window.INFURA_KEY}` },
+        rpc: { 1: `https://mainnet.infura.io/v3/${INFURA_KEY}` },
         qrcode: true
       });
       await wcProvider.enable();
       provider = new ethers.BrowserProvider(wcProvider);
     }
 
-    // Get signer immediately after connect
     const signer = await provider.getSigner();
-
     status.innerText = "Signing message...";
     const sig = await signer.signMessage(challenge);
 
@@ -46,3 +125,7 @@ async function connectAndSign() {
     status.innerText = "❌ " + err.message;
   }
 }
+</script>
+
+</body>
+</html>
