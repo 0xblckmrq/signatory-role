@@ -19,7 +19,7 @@
 <p>Connect your wallet that you have used to sign the covenant and sign the challenge below.</p>
 
 <input type="text" id="msg" placeholder="Challenge will appear here">
-<button onclick="connectAndSign()">Connect & Sign</button>
+<button id="signBtn">Connect & Sign</button>
 
 <p id="status"></p>
 <p id="signature"></p>
@@ -28,19 +28,24 @@
 import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js";
 import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js";
 
-// Fetch INFURA_KEY securely from the server
 let INFURA_KEY = "";
+
+// Fetch INFURA_KEY securely from server
 fetch("/config")
   .then(res => res.json())
   .then(data => { INFURA_KEY = data.INFURA_KEY; })
   .catch(err => console.error("Failed to load INFURA_KEY", err));
 
-// Auto-fill challenge from query string
-const urlParams = new URLSearchParams(window.location.search);
-const challengeParam = urlParams.get("challenge");
-if (challengeParam) document.getElementById("msg").value = challengeParam;
+// Auto-fill challenge from URL
+window.addEventListener("DOMContentLoaded", () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const challengeParam = urlParams.get("challenge");
+  if (challengeParam) {
+    document.getElementById("msg").value = decodeURIComponent(challengeParam);
+  }
+});
 
-async function connectAndSign() {
+document.getElementById("signBtn").addEventListener("click", async () => {
   const status = document.getElementById("status");
   const sigBox = document.getElementById("signature");
   const challenge = document.getElementById("msg").value;
@@ -84,7 +89,7 @@ async function connectAndSign() {
     console.error(err);
     status.innerText = "❌ " + err.message;
   }
-}
+});
 </script>
 
 </body>
