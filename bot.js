@@ -2,7 +2,7 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const { Client, GatewayIntentBits, REST, Routes, PermissionsBitField, ChannelType, SlashCommandBuilder } = require("discord.js");
-const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const { ethers } = require("ethers");
 
 // ================== CONFIG ==================
@@ -10,7 +10,7 @@ const TOKEN = process.env.BOT_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const API_KEY = process.env.WHITELIST_API_KEY;
-const EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL; // e.g. https://your-site.com
+const EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
 
 if (!TOKEN || !CLIENT_ID || !GUILD_ID || !API_KEY || !EXTERNAL_URL) {
   console.error("BOT_TOKEN, CLIENT_ID, GUILD_ID, WHITELIST_API_KEY, or RENDER_EXTERNAL_URL not set");
@@ -26,12 +26,11 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
 
 app.get("/", (req, res) => res.send("Bot running"));
-
 app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
 
 // ================== DISCORD CLIENT ==================
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
 
 // ========== COOLDOWN & CHALLENGES ==========
@@ -76,22 +75,37 @@ client.on("interactionCreate", async interaction => {
     const guild = interaction.guild;
     const member = interaction.member;
 
-    // Check cooldown
+    // Cooldown
     const last = cooldowns.get(userId) || 0;
     const now = Date.now();
     if (now - last < COOLDOWN_SECONDS * 1000) {
       const remaining = Math.ceil((COOLDOWN_SECONDS * 1000 - (now - last)) / 1000);
-      return interaction.reply({ content: `⏳ You can use /verify again in ${remaining} seconds.`, ephemeral: true });
+      const msg = `⏳ You can use /verify again in ${remaining} seconds.`;
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: msg, ephemeral: true });
+      } else {
+        await interaction.reply({ content: msg, ephemeral: true });
+      }
+      return;
     }
     cooldowns.set(userId, now);
 
-    // Fetch whitelist
+    // Whitelist check
     const list = await fetchWhitelist();
     const entry = list.find(w => w.walletAddress?.toLowerCase() === wallet);
-
-    if (!entry) return interaction.reply({ content: "❌ Wallet not found in whitelist.", ephemeral: true });
-    if (entry.covenantStatus?.toUpperCase() !== "SIGNED") return interaction.reply({ content: "❌ Wallet has not signed the covenant yet.", ephemeral: true });
-    if (entry.humanityStatus?.toUpperCase() !== "VERIFIED") return interaction.reply({ content: "❌ Wallet has not been verified for humanity.", ephemeral: true });
+    if (!entry || entry.covenantStatus?.toUpperCase() !== "SIGNED" || entry.humanityStatus?.toUpperCase() !== "VERIFIED") {
+      const msg = !entry
+        ? "❌ Wallet not found in whitelist."
+        : entry.covenantStatus?.toUpperCase() !== "SIGNED"
+          ? "❌ Wallet has not signed the covenant yet."
+          : "❌ Wallet has not been verified for humanity.";
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: msg, ephemeral: true });
+      } else {
+        await interaction.reply({ content: msg, ephemeral: true });
+      }
+      return;
+    }
 
     try {
       // Create private verification channel
@@ -101,34 +115,43 @@ client.on("interactionCreate", async interaction => {
         permissionOverwrites: [
           { id: guild.roles.everyone, deny: [PermissionsBitField.Flags.ViewChannel] },
           { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
-        ]
+          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+        ],
       });
 
       // Generate challenge
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Signer page link
+      // Signer URL
       const signerUrl = `${EXTERNAL_URL.replace(/\/$/, "")}/signer.html?userId=${member.id}&challenge=${encodeURIComponent(challenge)}`;
 
-      // Instructions
-      await channel.send(`
-# human.tech Covenant Signatory Verification
+      const msg = `# human.tech Covenant Signatory Verification
 
 Connect the wallet used to sign the covenant and sign the challenge below.
 
-🔗 Click the link (desktop MetaMask, mobile MetaMask, or WalletConnect supported):
+🔗 Click the link (desktop MetaMask, mobile MetaMask, WalletConnect supported):
 ${signerUrl}
 
-Verification will complete automatically.
-      `);
+Verification will complete automatically.`;
 
-      await interaction.reply({ content: `✅ Your private verification channel has been opened: ${channel}`, ephemeral: true });
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: msg, ephemeral: true });
+      } else {
+        await interaction.reply({ content: msg, ephemeral: true });
+      }
+
+      // Also post instructions in the private channel
+      await channel.send(msg);
 
     } catch (err) {
       console.error(err);
-      interaction.reply({ content: "❌ Failed to create verification channel.", ephemeral: true });
+      const msg = "❌ Failed to create verification channel.";
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: msg, ephemeral: true });
+      } else {
+        await interaction.reply({ content: msg, ephemeral: true });
+      }
     }
   }
 });
@@ -147,21 +170,17 @@ app.post("/api/signature", async (req, res) => {
       return res.status(400).json({ error: "Signature does not match wallet" });
     }
 
-    // Assign role
     const guild = client.guilds.cache.get(GUILD_ID);
     const member = await guild.members.fetch(userId);
     const role = guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
     if (role) await member.roles.add(role);
 
-    // Clean up
     challenges.delete(userId);
 
-    // Delete private channel after 5s
     const channel = member.guild.channels.cache.find(c => c.name === `verify-${member.user.username}`);
     if (channel) setTimeout(() => channel.delete().catch(() => {}), 5000);
 
     return res.json({ success: true });
-
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Verification failed" });
