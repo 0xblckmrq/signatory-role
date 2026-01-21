@@ -8,14 +8,10 @@
   body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
   h2 { color: #222; font-size: 20px; margin-bottom: 10px; }
   p { font-size: 14px; line-height: 1.5; }
-  input { width: 100%; padding: 10px; margin: 10px 0; font-size: 14px; box-sizing: border-box; }
-  button { padding: 12px 20px; font-size: 16px; cursor: pointer; margin-bottom: 10px; }
+  textarea { width: 100%; padding: 10px; font-size: 14px; box-sizing: border-box; resize: none; }
+  button { padding: 12px 20px; font-size: 16px; cursor: pointer; margin-top: 10px; width: 100%; }
   #signature { word-break: break-all; margin-top: 10px; display: none; background: #f0f0f0; padding: 10px; border-radius: 4px; }
   #status { margin-top: 10px; font-weight: bold; color: #333; }
-  @media (max-width: 500px) {
-    body { padding: 10px; }
-    button { width: 100%; }
-  }
 </style>
 </head>
 <body>
@@ -23,7 +19,7 @@
 <h2>human.tech Covenant Signatory Verification</h2>
 <p>Connect the wallet used to sign the covenant and sign the challenge below.</p>
 
-<input type="text" id="msg" placeholder="Challenge will appear here" readonly>
+<textarea id="msg" rows="3" readonly></textarea>
 <button id="signBtn">Connect & Sign</button>
 
 <p id="status"></p>
@@ -33,7 +29,7 @@
 import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js";
 import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js";
 
-// Load INFURA_KEY from /config
+// Load INFURA_KEY securely
 let INFURA_KEY = "";
 fetch("/config")
   .then(res => res.json())
@@ -45,20 +41,16 @@ window.addEventListener("DOMContentLoaded", () => {
   const urlParams = new URLSearchParams(window.location.search);
   const challengeParam = urlParams.get("challenge");
   if (challengeParam) {
-    const challengeInput = document.getElementById("msg");
-    challengeInput.value = decodeURIComponent(challengeParam);
-    challengeInput.select();
-    challengeInput.focus();
-    try { navigator.clipboard.writeText(challengeInput.value); } catch {}
+    const challengeTextarea = document.getElementById("msg");
+    challengeTextarea.value = decodeURIComponent(challengeParam);
   }
 });
 
-// Connect & sign button
+// Connect & sign
 document.getElementById("signBtn").addEventListener("click", async () => {
   const status = document.getElementById("status");
   const sigBox = document.getElementById("signature");
-  const challengeInput = document.getElementById("msg");
-  const challenge = challengeInput.value;
+  const challenge = document.getElementById("msg").value;
 
   if (!challenge) return alert("Missing challenge");
 
@@ -88,13 +80,7 @@ document.getElementById("signBtn").addEventListener("click", async () => {
     sigBox.style.display = "block";
     sigBox.innerText = sig;
 
-    try {
-      await navigator.clipboard.writeText(sig);
-      status.innerText = "✅ Signature copied! Paste it in Discord with /signature";
-    } catch {
-      status.innerText = "✅ Signature generated. Copy it manually and paste in Discord with /signature";
-    }
-
+    status.innerText = "✅ Signature generated. Paste it in Discord with /signature";
     sigBox.scrollIntoView({ behavior: "smooth", block: "center" });
 
   } catch (err) {
