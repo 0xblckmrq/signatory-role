@@ -2,7 +2,7 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const { Client, GatewayIntentBits, REST, Routes, PermissionsBitField, ChannelType, SlashCommandBuilder } = require("discord.js");
-const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const { ethers } = require("ethers");
 
 // ================== CONFIG ==================
@@ -23,7 +23,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
 
-// Provide INFURA_KEY to signer.html via /config
 app.get("/config", (req, res) => {
   res.json({ INFURA_KEY: process.env.INFURA_KEY || "" });
 });
@@ -133,12 +132,11 @@ client.on("interactionCreate", async interaction => {
       // Signer URL
       const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
-      // Send instructions in private channel with prefilled challenge text
+      // Send instructions in private channel with prefilled challenge
       await channel.send(`
 1️⃣ **Wallet Verification**
 
-Your challenge is auto-filled here:
-\`${challenge}\`
+Your challenge is pre-filled in the signer page.
 
 🔗 Click the signer page link to connect wallet and sign:
 ${signerUrl}
