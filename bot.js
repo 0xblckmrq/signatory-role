@@ -44,11 +44,6 @@ const COOLDOWN_SECONDS = 300; // 5 minutes
     new SlashCommandBuilder()
       .setName("verify")
       .setDescription("Start wallet verification")
-      .addStringOption(opt =>
-        opt.setName("wallet")
-          .setDescription("Your wallet address")
-          .setRequired(true)
-      )
   ].map(c => c.toJSON());
 
   const rest = new REST({ version: "10" }).setToken(TOKEN);
@@ -70,7 +65,6 @@ client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === "verify") {
-    const wallet = interaction.options.getString("wallet").toLowerCase();
     const userId = interaction.user.id;
     const guild = interaction.guild;
     const member = interaction.member;
@@ -90,24 +84,25 @@ client.on("interactionCreate", async interaction => {
     }
     cooldowns.set(userId, now);
 
-    // Whitelist check
-    const list = await fetchWhitelist();
-    const entry = list.find(w => w.walletAddress?.toLowerCase() === wallet);
-    if (!entry || entry.covenantStatus?.toUpperCase() !== "SIGNED" || entry.humanityStatus?.toUpperCase() !== "VERIFIED") {
-      const msg = !entry
-        ? "❌ Wallet not found in whitelist."
-        : entry.covenantStatus?.toUpperCase() !== "SIGNED"
-          ? "❌ Wallet has not signed the covenant yet."
-          : "❌ Wallet has not been verified for humanity.";
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: msg, ephemeral: true });
-      } else {
-        await interaction.reply({ content: msg, ephemeral: true });
-      }
-      return;
-    }
-
     try {
+      // Fetch whitelist and pick first eligible SIGNED + VERIFIED wallet
+      const list = await fetchWhitelist();
+      const entry = list.find(
+        w => w.humanityStatus?.toUpperCase() === "VERIFIED" && w.covenantStatus?.toUpperCase() === "SIGNED"
+      );
+
+      if (!entry) {
+        const msg = "❌ No eligible wallet found for verification (must be SIGNED + VERIFIED).";
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({ content: msg, ephemeral: true });
+        } else {
+          await interaction.reply({ content: msg, ephemeral: true });
+        }
+        return;
+      }
+
+      const wallet = entry.walletAddress.toLowerCase();
+
       // Create private verification channel
       const channel = await guild.channels.create({
         name: `verify-${member.user.username}`,
@@ -123,7 +118,7 @@ client.on("interactionCreate", async interaction => {
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Signer URL
+      // Signer URL auto-fills wallet & userId
       const signerUrl = `${EXTERNAL_URL.replace(/\/$/, "")}/signer.html?userId=${member.id}&challenge=${encodeURIComponent(challenge)}`;
 
       const msg = `# human.tech Covenant Signatory Verification
@@ -141,7 +136,6 @@ Verification will complete automatically.`;
         await interaction.reply({ content: msg, ephemeral: true });
       }
 
-      // Also post instructions in the private channel
       await channel.send(msg);
 
     } catch (err) {
