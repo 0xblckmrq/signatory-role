@@ -8,34 +8,49 @@
 </head>
 <body>
 <h2>Sign Your Bot Message</h2>
-<input type="text" id="msg" placeholder="Paste challenge here" size="80">
+
+<input type="text" id="msg" size="80" readonly />
+<br><br>
 <button onclick="sign()">Sign Message</button>
+
 <p id="signature"></p>
 
 <script>
+function getChallengeFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("challenge");
+}
+
+window.onload = () => {
+  const challenge = getChallengeFromURL();
+  if (challenge) {
+    document.getElementById("msg").value = decodeURIComponent(challenge);
+  }
+};
+
 async function sign() {
   const challenge = document.getElementById("msg").value;
-  if (!challenge) return alert("Paste the challenge message!");
+  if (!challenge) return alert("Missing challenge!");
 
-  // Check for MetaMask
   let provider;
+
   if (window.ethereum) {
+    await window.ethereum.request({ method: "eth_requestAccounts" });
     provider = new ethers.BrowserProvider(window.ethereum);
-    await window.ethereum.request({ method: 'eth_requestAccounts' });
   } else {
-    // WalletConnect fallback
     const wcProvider = new WalletConnectProvider.default({
-      infuraId: "YOUR_INFURA_KEY" // from Render env
+      infuraId: window.INFURA_KEY || "YOUR_INFURA_KEY"
     });
     await wcProvider.enable();
     provider = new ethers.BrowserProvider(wcProvider);
   }
 
   const signer = await provider.getSigner();
+
   try {
     const sig = await signer.signMessage(challenge);
     document.getElementById("signature").innerText = sig;
-  } catch(e) {
+  } catch (e) {
     alert(e.message);
   }
 }
