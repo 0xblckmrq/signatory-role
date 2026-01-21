@@ -22,10 +22,14 @@ const API_URL = "http://manifest.human.tech/api/covenant/signers-export";
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
+
 app.get("/", (req, res) => res.send("Bot running"));
+
+// Serve Infura key securely
 app.get("/config", (req, res) => {
-  res.json({ INFURA_KEY: process.env.INFURA_KEY || "" });
+  res.json({ INFURA_KEY: process.env.INFURA_KEY });
 });
+
 app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
 
 // ================== DISCORD CLIENT ==================
@@ -127,17 +131,16 @@ client.on("interactionCreate", async interaction => {
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Correct signer URL
+      // Signer URL auto-fills challenge
       const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
-      // Send instructions in private channel
       await channel.send(`
 1️⃣ **Wallet Verification**
 
 🔗 Click the signer page link:
 ${signerUrl}
 
-Connect your wallet that you have used to sign the covenant and sign the message.
+The challenge is already filled. Connect your wallet that you have used to sign the covenant and sign the message.
 
 Submit your signature here:
 /signature <paste_your_signature_here>
