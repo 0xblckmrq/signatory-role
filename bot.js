@@ -1,16 +1,8 @@
 require("dotenv").config();
 const path = require("path");
 const express = require("express");
-const {
-  Client,
-  GatewayIntentBits,
-  REST,
-  Routes,
-  PermissionsBitField,
-  ChannelType,
-  SlashCommandBuilder
-} = require("discord.js");
-const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
+const { Client, GatewayIntentBits, REST, Routes, PermissionsBitField, ChannelType, SlashCommandBuilder } = require("discord.js");
+const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
 const { ethers } = require("ethers");
 
 // ================== CONFIG ==================
@@ -31,7 +23,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
 
-// Endpoint to serve INFURA_KEY securely to signer.html
+// Serve INFURA_KEY securely to signer page
 app.get("/config", (req, res) => {
   res.json({ INFURA_KEY: process.env.INFURA_KEY });
 });
@@ -109,18 +101,13 @@ client.on("interactionCreate", async interaction => {
     const list = await fetchWhitelist();
     const entry = list.find(w => w.walletAddress?.toLowerCase() === wallet);
 
-    if (!entry) {
-      return interaction.reply({ content: "❌ Wallet not found in whitelist.", ephemeral: true });
-    }
+    if (!entry) return interaction.reply({ content: "❌ Wallet not found in whitelist.", ephemeral: true });
 
-    // Must be SIGNED and VERIFIED
-    if (entry.covenantStatus?.toUpperCase() !== "SIGNED") {
+    if (entry.covenantStatus?.toUpperCase() !== "SIGNED")
       return interaction.reply({ content: "❌ Wallet has not signed the covenant yet. Cannot proceed.", ephemeral: true });
-    }
 
-    if (entry.humanityStatus?.toUpperCase() !== "VERIFIED") {
+    if (entry.humanityStatus?.toUpperCase() !== "VERIFIED")
       return interaction.reply({ content: "❌ Wallet has not been verified for humanity. Cannot proceed.", ephemeral: true });
-    }
 
     try {
       // Create private verification channel
@@ -138,21 +125,22 @@ client.on("interactionCreate", async interaction => {
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Full clickable signer page link with challenge auto-filled
-      const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
+      // Correct signer URL
+      const baseUrl = process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "");
+      const signerUrl = `${baseUrl}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
       // Send instructions in private channel
-      await channel.send({
-        content: `1️⃣ **human.tech Covenant Signatory Verification**
+      await channel.send(`
+1️⃣ **human.tech Covenant Signatory Verification**
 
 🔗 Click the signer page link:
-<${signerUrl}>
+${signerUrl}
 
-Connect your wallet that you have used to sign the covenant and sign the challenge.
+Connect the wallet used to sign the covenant and sign the challenge.
 
 Submit your signature here:
-/signature <paste_your_signature_here>`
-      });
+/signature <paste_your_signature_here>
+      `);
 
       await interaction.reply({ content: `✅ Your private verification channel has been opened: ${channel}`, ephemeral: true });
 
@@ -170,11 +158,9 @@ Submit your signature here:
     if (!data) return interaction.reply({ content: "❌ No active verification.", ephemeral: true });
 
     try {
-      // Recover wallet from signature
       const recovered = ethers.verifyMessage(data.challenge, sig);
-      if (recovered.toLowerCase() !== data.wallet.toLowerCase()) {
+      if (recovered.toLowerCase() !== data.wallet.toLowerCase())
         return interaction.reply({ content: "❌ Signature does not match provided wallet.", ephemeral: true });
-      }
 
       // Assign updated role
       const role = interaction.guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
