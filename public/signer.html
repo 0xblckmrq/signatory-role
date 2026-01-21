@@ -8,7 +8,7 @@
   body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
   h2 { color: #222; font-size: 20px; margin-bottom: 10px; }
   p { font-size: 14px; line-height: 1.5; }
-  textarea { width: 100%; padding: 10px; font-size: 14px; box-sizing: border-box; resize: none; }
+  textarea { width: 100%; padding: 10px; font-size: 14px; box-sizing: border-box; resize: none; height: 60px; }
   button { padding: 12px 20px; font-size: 16px; cursor: pointer; margin-top: 10px; width: 100%; }
   #signature { word-break: break-all; margin-top: 10px; display: none; background: #f0f0f0; padding: 10px; border-radius: 4px; }
   #status { margin-top: 10px; font-weight: bold; color: #333; }
@@ -19,7 +19,7 @@
 <h2>human.tech Covenant Signatory Verification</h2>
 <p>Connect the wallet used to sign the covenant and sign the challenge below.</p>
 
-<textarea id="msg" rows="3" readonly></textarea>
+<textarea id="msg" readonly></textarea>
 <button id="signBtn">Connect & Sign</button>
 
 <p id="status"></p>
@@ -29,23 +29,28 @@
 import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js";
 import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js";
 
-// Load INFURA_KEY securely from server
 let INFURA_KEY = "";
+
+// Load INFURA_KEY from server
 fetch("/config")
   .then(res => res.json())
-  .then(data => { INFURA_KEY = data.INFURA_KEY; })
+  .then(data => { INFURA_KEY = data.INFURA_KEY || ""; })
   .catch(err => console.error("Failed to load INFURA_KEY", err));
 
 // Auto-fill challenge from URL
-window.addEventListener("DOMContentLoaded", () => {
+function prefillChallenge() {
   const urlParams = new URLSearchParams(window.location.search);
   const challengeParam = urlParams.get("challenge");
+  const textarea = document.getElementById("msg");
   if (challengeParam) {
-    document.getElementById("msg").value = decodeURIComponent(challengeParam);
+    textarea.value = decodeURIComponent(challengeParam);
   }
-});
+}
 
-// Connect wallet and sign
+// Call immediately
+prefillChallenge();
+
+// Connect wallet and sign challenge
 document.getElementById("signBtn").addEventListener("click", async () => {
   const status = document.getElementById("status");
   const sigBox = document.getElementById("signature");
