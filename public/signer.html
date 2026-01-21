@@ -2,8 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>human.tech Covenant Signer</title>
+  <title>human.tech Covenant Signatory Verification</title>
 
+  <!-- WalletConnect & Ethers -->
   <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.umd.min.js"></script>
 
@@ -16,6 +17,7 @@
       margin: auto;
       padding: 40px;
     }
+    h2 { margin-bottom: 10px; }
     input {
       width: 100%;
       padding: 12px;
@@ -34,6 +36,7 @@
       font-size: 16px;
       cursor: pointer;
     }
+    button:hover { opacity: 0.9; }
     #status { margin-top: 12px; font-size: 14px; }
     #signature {
       word-break: break-all;
@@ -49,7 +52,7 @@
 <body>
 
 <h2>🔐 human.tech Covenant Signatory Verification</h2>
-<p>Connect and sign the wallet used to sign the covenant.</p>
+<p>Connect your wallet that you have used to sign the covenant.</p>
 
 <input type="text" id="msg" readonly />
 <button onclick="connectAndSign()">Connect Wallet & Sign</button>
@@ -70,10 +73,13 @@ window.onload = async () => {
   }
 
   try {
+    // Load Infura key securely from /config
     const res = await fetch("/config");
     const json = await res.json();
     window.INFURA_KEY = json.INFURA_KEY;
-  } catch {}
+  } catch (err) {
+    console.error("Cannot load Infura key", err);
+  }
 };
 
 async function connectAndSign() {
@@ -94,12 +100,11 @@ async function connectAndSign() {
       provider = new window.ethers.BrowserProvider(window.ethereum);
     } else {
       const wcProvider = new WalletConnectProvider.default({
-  rpc: {
-    1: `https://mainnet.infura.io/v3/${window.INFURA_KEY}`  // Ethereum Mainnet
-  },
-  qrcode: true
-});
-
+        rpc: {
+          1: `https://mainnet.infura.io/v3/${window.INFURA_KEY}` // Ethereum Mainnet
+        },
+        qrcode: true
+      });
       await wcProvider.enable();
       provider = new window.ethers.BrowserProvider(wcProvider);
     }
@@ -115,6 +120,7 @@ async function connectAndSign() {
     await navigator.clipboard.writeText(sig);
 
     status.innerText = "✅ Signature copied. Paste it in Discord with /signature";
+
   } catch (err) {
     console.error(err);
     status.innerText = "❌ " + err.message;
