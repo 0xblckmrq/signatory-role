@@ -1,6 +1,6 @@
 {
   "name": "sbt-verifier-bot",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "description": "Discord bot for human.tech Covenant Signatory verification using whitelist and wallet signature",
   "main": "bot.js",
   "type": "commonjs",
