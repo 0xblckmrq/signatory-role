@@ -31,6 +31,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
 
+// Provide INFURA_KEY to signer.html
 app.get("/config", (req, res) => {
   res.json({ INFURA_KEY: process.env.INFURA_KEY || "" });
 });
@@ -95,7 +96,7 @@ client.on("interactionCreate", async interaction => {
     const wallet = interaction.options.getString("wallet").toLowerCase();
     const userId = interaction.user.id;
 
-    // Check cooldown
+    // Cooldown check
     const last = cooldowns.get(userId) || 0;
     const now = Date.now();
     if (now - last < COOLDOWN_SECONDS * 1000) {
@@ -108,21 +109,18 @@ client.on("interactionCreate", async interaction => {
     const list = await fetchWhitelist();
     const entry = list.find(w => w.walletAddress?.toLowerCase() === wallet);
 
-    if (!entry) {
-      return interaction.reply({ content: "❌ Wallet not found in whitelist.", ephemeral: true });
-    }
+    if (!entry) return interaction.reply({ content: "❌ Wallet not found in whitelist.", ephemeral: true });
 
-    // Must be SIGNED and VERIFIED
+    // Only SIGNED & VERIFIED wallets pass
     if (entry.covenantStatus?.toUpperCase() !== "SIGNED") {
       return interaction.reply({ content: "❌ Wallet has not signed the covenant yet. Cannot proceed.", ephemeral: true });
     }
-
     if (entry.humanityStatus?.toUpperCase() !== "VERIFIED") {
       return interaction.reply({ content: "❌ Wallet has not been verified for humanity. Cannot proceed.", ephemeral: true });
     }
 
     try {
-      // Create private verification channel
+      // Create private channel
       const channel = await guild.channels.create({
         name: `verify-${member.user.username}`,
         type: ChannelType.GuildText,
@@ -137,7 +135,7 @@ client.on("interactionCreate", async interaction => {
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Signer URL
+      // Signer URL with pre-filled challenge
       const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
       // Send instructions in private channel
@@ -169,7 +167,6 @@ After signing, submit your signature here:
     if (!data) return interaction.reply({ content: "❌ No active verification.", ephemeral: true });
 
     try {
-      // Recover wallet from signature
       const recovered = ethers.verifyMessage(data.challenge, sig);
       if (recovered.toLowerCase() !== data.wallet.toLowerCase()) {
         return interaction.reply({ content: "❌ Signature does not match provided wallet.", ephemeral: true });
@@ -184,7 +181,7 @@ After signing, submit your signature here:
       // Clean up
       challenges.delete(interaction.user.id);
 
-      // Auto-delete channel after 5s
+      // Auto-delete channel
       setTimeout(() => interaction.channel.delete(), 5000);
 
     } catch (err) {
