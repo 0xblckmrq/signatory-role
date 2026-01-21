@@ -29,24 +29,23 @@
 import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js";
 import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js";
 
-// Load INFURA_KEY securely
+// Load INFURA_KEY securely from server
 let INFURA_KEY = "";
 fetch("/config")
   .then(res => res.json())
   .then(data => { INFURA_KEY = data.INFURA_KEY; })
   .catch(err => console.error("Failed to load INFURA_KEY", err));
 
-// Auto-fill challenge from URL query
+// Auto-fill challenge from URL
 window.addEventListener("DOMContentLoaded", () => {
   const urlParams = new URLSearchParams(window.location.search);
   const challengeParam = urlParams.get("challenge");
   if (challengeParam) {
-    const challengeTextarea = document.getElementById("msg");
-    challengeTextarea.value = decodeURIComponent(challengeParam);
+    document.getElementById("msg").value = decodeURIComponent(challengeParam);
   }
 });
 
-// Connect & sign
+// Connect wallet and sign
 document.getElementById("signBtn").addEventListener("click", async () => {
   const status = document.getElementById("status");
   const sigBox = document.getElementById("signature");
@@ -61,9 +60,11 @@ document.getElementById("signBtn").addEventListener("click", async () => {
     let provider;
 
     if (window.ethereum) {
+      // MetaMask
       await window.ethereum.request({ method: "eth_requestAccounts" });
       provider = new ethers.BrowserProvider(window.ethereum);
     } else {
+      // WalletConnect for mobile
       if (!INFURA_KEY) throw new Error("INFURA_KEY not loaded yet");
       const wcProvider = new WalletConnectProvider.default({
         rpc: { 1: `https://mainnet.infura.io/v3/${INFURA_KEY}` },
@@ -73,6 +74,7 @@ document.getElementById("signBtn").addEventListener("click", async () => {
       provider = new ethers.BrowserProvider(wcProvider);
     }
 
+    // Sign message immediately after connecting
     const signer = await provider.getSigner();
     status.innerText = "Signing message...";
 
