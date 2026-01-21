@@ -1,7 +1,7 @@
 {
   "name": "sbt-verifier-bot",
-  "version": "1.0.0",
-  "description": "Discord bot for Human ID verification using whitelist and wallet signature (WalletConnect / MetaMask)",
+  "version": "1.0.1",
+  "description": "Discord bot for human.tech Covenant Signatory Verification",
   "main": "bot.js",
   "type": "commonjs",
   "scripts": {
@@ -11,8 +11,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
-    "ethers": "^6.8.1",
+    "discord.js": "^14.15.0",
+    "ethers": "^6.8.3",
     "node-fetch": "^3.3.2",
     "dotenv": "^16.4.5",
     "express": "^4.18.2",
