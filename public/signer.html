@@ -16,9 +16,9 @@
 <body>
 
 <h2>human.tech Covenant Signatory Verification</h2>
-<p>Connect your wallet that you have used to sign the covenant and sign the challenge below.</p>
+<p>Connect the wallet used to sign the covenant and sign the challenge below.</p>
 
-<input type="text" id="msg" placeholder="Challenge will appear here">
+<input type="text" id="msg" placeholder="Challenge will appear here" readonly>
 <button id="signBtn">Connect & Sign</button>
 
 <p id="status"></p>
@@ -30,7 +30,7 @@ import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/w
 
 let INFURA_KEY = "";
 
-// Fetch INFURA_KEY securely from server
+// Fetch INFURA_KEY from server endpoint
 fetch("/config")
   .then(res => res.json())
   .then(data => { INFURA_KEY = data.INFURA_KEY; })
@@ -41,14 +41,18 @@ window.addEventListener("DOMContentLoaded", () => {
   const urlParams = new URLSearchParams(window.location.search);
   const challengeParam = urlParams.get("challenge");
   if (challengeParam) {
-    document.getElementById("msg").value = decodeURIComponent(challengeParam);
+    const challengeInput = document.getElementById("msg");
+    challengeInput.value = decodeURIComponent(challengeParam);
+    challengeInput.select();
+    challengeInput.focus();
   }
 });
 
 document.getElementById("signBtn").addEventListener("click", async () => {
   const status = document.getElementById("status");
   const sigBox = document.getElementById("signature");
-  const challenge = document.getElementById("msg").value;
+  const challengeInput = document.getElementById("msg");
+  const challenge = challengeInput.value;
 
   if (!challenge) return alert("Missing challenge");
 
@@ -59,9 +63,11 @@ document.getElementById("signBtn").addEventListener("click", async () => {
     let provider;
 
     if (window.ethereum) {
+      // Desktop MetaMask
       await window.ethereum.request({ method: "eth_requestAccounts" });
       provider = new ethers.BrowserProvider(window.ethereum);
     } else {
+      // Mobile WalletConnect
       if (!INFURA_KEY) throw new Error("INFURA_KEY not loaded yet");
       const wcProvider = new WalletConnectProvider.default({
         rpc: { 1: `https://mainnet.infura.io/v3/${INFURA_KEY}` },
@@ -73,14 +79,16 @@ document.getElementById("signBtn").addEventListener("click", async () => {
 
     const signer = await provider.getSigner();
     status.innerText = "Signing message...";
-    const sig = await signer.signMessage(challenge);
 
+    const sig = await signer.signMessage(challenge);
     sigBox.style.display = "block";
     sigBox.innerText = sig;
 
+    // Auto-copy challenge AND signature for convenience
     try {
-      await navigator.clipboard.writeText(sig);
-      status.innerText = "✅ Signature copied. Paste it in Discord with /signature";
+      await navigator.clipboard.writeText(challenge);
+      await navigator.clipboard.writeText(sig); // overwrite with signature
+      status.innerText = "✅ Challenge & Signature copied! Paste the signature in Discord with /signature";
     } catch {
       status.innerText = "✅ Signature generated. Copy it manually and paste in Discord with /signature";
     }
