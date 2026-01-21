@@ -31,7 +31,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
 
-// Provide INFURA_KEY to signer.html
+// Serve INFURA_KEY securely to signer.html
 app.get("/config", (req, res) => {
   res.json({ INFURA_KEY: process.env.INFURA_KEY || "" });
 });
@@ -120,7 +120,7 @@ client.on("interactionCreate", async interaction => {
     }
 
     try {
-      // Create private channel
+      // Create private verification channel
       const channel = await guild.channels.create({
         name: `verify-${member.user.username}`,
         type: ChannelType.GuildText,
@@ -135,14 +135,14 @@ client.on("interactionCreate", async interaction => {
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Signer URL with pre-filled challenge
+      // Correct signer URL (challenge prefilled)
       const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
       // Send instructions in private channel
       await channel.send(`
 1️⃣ **Wallet Verification**
 
-Your challenge is **pre-filled** in the signer page.
+Your challenge is prefilled in the signer page.
 
 🔗 Click the signer page link to connect your wallet and sign:
 ${signerUrl}
@@ -172,7 +172,7 @@ After signing, submit your signature here:
         return interaction.reply({ content: "❌ Signature does not match provided wallet.", ephemeral: true });
       }
 
-      // Assign role
+      // Assign Covenant Verified Signatory role
       const role = interaction.guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
       if (role) await interaction.member.roles.add(role);
 
@@ -181,7 +181,7 @@ After signing, submit your signature here:
       // Clean up
       challenges.delete(interaction.user.id);
 
-      // Auto-delete channel
+      // Auto-delete channel after 5s
       setTimeout(() => interaction.channel.delete(), 5000);
 
     } catch (err) {
