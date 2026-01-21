@@ -5,7 +5,7 @@
   <title>Human ID Wallet Signer</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.umd.min.js"></script>
 
   <style>
     body {
@@ -16,7 +16,6 @@
       margin: auto;
       padding: 40px;
     }
-    h2 { margin-bottom: 10px; }
     input {
       width: 100%;
       padding: 12px;
@@ -35,7 +34,6 @@
       font-size: 16px;
       cursor: pointer;
     }
-    button:hover { opacity: .9; }
     #status { margin-top: 12px; font-size: 14px; }
     #signature {
       word-break: break-all;
@@ -54,7 +52,6 @@
 <p>Connect any EVM wallet and sign the challenge below.</p>
 
 <input type="text" id="msg" readonly />
-
 <button onclick="connectAndSign()">Connect Wallet & Sign</button>
 
 <div id="status"></div>
@@ -72,7 +69,6 @@ window.onload = async () => {
     document.getElementById("msg").value = decodeURIComponent(challenge);
   }
 
-  // Load Infura key securely
   try {
     const res = await fetch("/config");
     const json = await res.json();
@@ -95,14 +91,14 @@ async function connectAndSign() {
   try {
     if (window.ethereum) {
       await window.ethereum.request({ method: "eth_requestAccounts" });
-      provider = new ethers.BrowserProvider(window.ethereum);
+      provider = new window.ethers.BrowserProvider(window.ethereum);
     } else {
       const wcProvider = new WalletConnectProvider.default({
         infuraId: window.INFURA_KEY,
         qrcode: true
       });
       await wcProvider.enable();
-      provider = new ethers.BrowserProvider(wcProvider);
+      provider = new window.ethers.BrowserProvider(wcProvider);
     }
 
     const signer = await provider.getSigner();
@@ -113,7 +109,7 @@ async function connectAndSign() {
     sigBox.style.display = "block";
     sigBox.innerText = sig;
 
-    navigator.clipboard.writeText(sig);
+    await navigator.clipboard.writeText(sig);
 
     status.innerText = "✅ Signature copied. Paste it in Discord with /signature";
   } catch (err) {
