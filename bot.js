@@ -31,7 +31,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
 
-// Serve INFURA_KEY securely to signer.html
+// Serve INFURA_KEY to signer page securely
 app.get("/config", (req, res) => {
   res.json({ INFURA_KEY: process.env.INFURA_KEY || "" });
 });
@@ -96,7 +96,7 @@ client.on("interactionCreate", async interaction => {
     const wallet = interaction.options.getString("wallet").toLowerCase();
     const userId = interaction.user.id;
 
-    // Cooldown check
+    // Cooldown
     const last = cooldowns.get(userId) || 0;
     const now = Date.now();
     if (now - last < COOLDOWN_SECONDS * 1000) {
@@ -111,7 +111,6 @@ client.on("interactionCreate", async interaction => {
 
     if (!entry) return interaction.reply({ content: "❌ Wallet not found in whitelist.", ephemeral: true });
 
-    // Only SIGNED & VERIFIED wallets pass
     if (entry.covenantStatus?.toUpperCase() !== "SIGNED") {
       return interaction.reply({ content: "❌ Wallet has not signed the covenant yet. Cannot proceed.", ephemeral: true });
     }
@@ -120,7 +119,6 @@ client.on("interactionCreate", async interaction => {
     }
 
     try {
-      // Create private verification channel
       const channel = await guild.channels.create({
         name: `verify-${member.user.username}`,
         type: ChannelType.GuildText,
@@ -131,14 +129,11 @@ client.on("interactionCreate", async interaction => {
         ]
       });
 
-      // Generate challenge
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Correct signer URL (challenge prefilled)
       const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
-      // Send instructions in private channel
       await channel.send(`
 1️⃣ **Wallet Verification**
 
@@ -172,16 +167,13 @@ After signing, submit your signature here:
         return interaction.reply({ content: "❌ Signature does not match provided wallet.", ephemeral: true });
       }
 
-      // Assign Covenant Verified Signatory role
       const role = interaction.guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
       if (role) await interaction.member.roles.add(role);
 
       await interaction.reply({ content: "✅ Verified! Role assigned.", ephemeral: true });
 
-      // Clean up
       challenges.delete(interaction.user.id);
 
-      // Auto-delete channel after 5s
       setTimeout(() => interaction.channel.delete(), 5000);
 
     } catch (err) {
