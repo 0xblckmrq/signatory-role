@@ -29,25 +29,24 @@
 import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js";
 import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js";
 
+// Load INFURA_KEY from server-side (hidden)
 let INFURA_KEY = "";
-
-// Load INFURA_KEY from server
 fetch("/config")
   .then(res => res.json())
   .then(data => { INFURA_KEY = data.INFURA_KEY || ""; })
   .catch(err => console.error("Failed to load INFURA_KEY", err));
 
-// Auto-fill challenge from URL
+// Auto-fill challenge from URL parameter
 function prefillChallenge() {
   const urlParams = new URLSearchParams(window.location.search);
   const challengeParam = urlParams.get("challenge");
-  const textarea = document.getElementById("msg");
   if (challengeParam) {
+    const textarea = document.getElementById("msg");
     textarea.value = decodeURIComponent(challengeParam);
   }
 }
 
-// Call immediately
+// Prefill challenge immediately
 prefillChallenge();
 
 // Connect wallet and sign challenge
@@ -65,11 +64,11 @@ document.getElementById("signBtn").addEventListener("click", async () => {
     let provider;
 
     if (window.ethereum) {
-      // MetaMask
+      // MetaMask (desktop)
       await window.ethereum.request({ method: "eth_requestAccounts" });
       provider = new ethers.BrowserProvider(window.ethereum);
     } else {
-      // WalletConnect for mobile
+      // WalletConnect (mobile)
       if (!INFURA_KEY) throw new Error("INFURA_KEY not loaded yet");
       const wcProvider = new WalletConnectProvider.default({
         rpc: { 1: `https://mainnet.infura.io/v3/${INFURA_KEY}` },
@@ -79,14 +78,13 @@ document.getElementById("signBtn").addEventListener("click", async () => {
       provider = new ethers.BrowserProvider(wcProvider);
     }
 
-    // Sign message immediately after connecting
+    // Sign message immediately
     const signer = await provider.getSigner();
     status.innerText = "Signing message...";
-
     const sig = await signer.signMessage(challenge);
+
     sigBox.style.display = "block";
     sigBox.innerText = sig;
-
     status.innerText = "✅ Signature generated. Paste it in Discord with /signature";
     sigBox.scrollIntoView({ behavior: "smooth", block: "center" });
 
