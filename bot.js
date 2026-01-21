@@ -125,7 +125,7 @@ client.on("interactionCreate", async interaction => {
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Correct signer URL
+      // Correct signer URL (challenge auto-filled)
       const baseUrl = process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "");
       const signerUrl = `${baseUrl}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
@@ -136,7 +136,7 @@ client.on("interactionCreate", async interaction => {
 🔗 Click the signer page link:
 ${signerUrl}
 
-Connect the wallet used to sign the covenant and sign the challenge.
+Connect the wallet used to sign the covenant and sign the challenge. The challenge is pre-filled for you.
 
 Submit your signature here:
 /signature <paste_your_signature_here>
