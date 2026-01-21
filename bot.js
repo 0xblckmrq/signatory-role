@@ -1,8 +1,16 @@
 require("dotenv").config();
 const path = require("path");
 const express = require("express");
-const { Client, GatewayIntentBits, REST, Routes, PermissionsBitField, ChannelType, SlashCommandBuilder } = require("discord.js");
-const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
+const {
+  Client,
+  GatewayIntentBits,
+  REST,
+  Routes,
+  PermissionsBitField,
+  ChannelType,
+  SlashCommandBuilder
+} = require("discord.js");
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const { ethers } = require("ethers");
 
 // ================== CONFIG ==================
@@ -23,13 +31,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/", (req, res) => res.send("Bot running"));
-
-// Serve Infura key securely
+// Endpoint to serve INFURA_KEY securely to signer.html
 app.get("/config", (req, res) => {
   res.json({ INFURA_KEY: process.env.INFURA_KEY });
 });
 
+app.get("/", (req, res) => res.send("Bot running"));
 app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
 
 // ================== DISCORD CLIENT ==================
@@ -131,20 +138,21 @@ client.on("interactionCreate", async interaction => {
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Signer URL auto-fills challenge
+      // Full clickable signer page link with challenge auto-filled
       const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
-      await channel.send(`
-1️⃣ **Wallet Verification**
+      // Send instructions in private channel
+      await channel.send({
+        content: `1️⃣ **human.tech Covenant Signatory Verification**
 
 🔗 Click the signer page link:
-${signerUrl}
+<${signerUrl}>
 
-The challenge is already filled. Connect your wallet that you have used to sign the covenant and sign the message.
+Connect your wallet that you have used to sign the covenant and sign the challenge.
 
 Submit your signature here:
-/signature <paste_your_signature_here>
-      `);
+/signature <paste_your_signature_here>`
+      });
 
       await interaction.reply({ content: `✅ Your private verification channel has been opened: ${channel}`, ephemeral: true });
 
@@ -168,7 +176,7 @@ Submit your signature here:
         return interaction.reply({ content: "❌ Signature does not match provided wallet.", ephemeral: true });
       }
 
-      // Assign role
+      // Assign updated role
       const role = interaction.guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
       if (role) await interaction.member.roles.add(role);
 
