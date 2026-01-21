@@ -24,7 +24,6 @@
     let signer;
     let INFURA_KEY;
 
-    // 1️⃣ Fetch Infura key from backend
     async function fetchConfig() {
       try {
         const res = await fetch("/config.json");
@@ -36,12 +35,11 @@
       }
     }
 
-    // 2️⃣ Auto-populate challenge from URL
+    // Auto-populate challenge from URL
     const urlParams = new URLSearchParams(window.location.search);
     const challenge = urlParams.get('challenge') || '';
     document.getElementById('msg').value = challenge;
 
-    // 3️⃣ Connect wallet
     async function connectWallet() {
       if (provider && signer) return;
 
@@ -63,7 +61,6 @@
       signer = await provider.getSigner();
     }
 
-    // 4️⃣ Sign the challenge
     document.getElementById('signBtn').onclick = async function() {
       try {
         if (!challenge) throw new Error("Challenge not found in URL");
@@ -71,7 +68,6 @@
         const signature = await signer.signMessage(challenge);
         document.getElementById("signature").innerText = signature;
 
-        // Auto-select text for easy copy
         const range = document.createRange();
         range.selectNode(document.getElementById("signature"));
         window.getSelection().removeAllRanges();
@@ -83,7 +79,6 @@
       }
     };
 
-    // Initialize
     fetchConfig();
   </script>
 </body>
