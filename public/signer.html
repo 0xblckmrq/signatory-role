@@ -6,7 +6,6 @@
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
     button { padding: 10px 15px; margin-top: 20px; font-size: 16px; }
-    #signature { margin-top: 15px; word-break: break-word; }
     #status { margin-top: 15px; font-weight: bold; }
   </style>
 </head>
@@ -16,48 +15,63 @@
   <p>Challenge:</p>
   <input type="text" id="msg" readonly style="width:100%; padding:8px;">
   <br>
-  <button onclick="sign()">Connect & Sign</button>
+  <button id="signBtn">Connect & Sign</button>
   <p id="status"></p>
 
   <script type="module">
-    import { ethers } from 'https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.min.js';
-
+    import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/esm/index.min.js";
     const urlParams = new URLSearchParams(window.location.search);
     const challenge = urlParams.get("challenge") || "";
     const userId = urlParams.get("userId");
-    const botApi = '/signature-bot'; // dummy placeholder if you want a separate endpoint later
 
     document.getElementById("msg").value = challenge;
 
-    async function sign() {
+    document.getElementById("signBtn").addEventListener("click", async () => {
+      const status = document.getElementById("status");
+
       try {
         let provider;
+
         if (window.ethereum) {
-          provider = new ethers.BrowserProvider(window.ethereum);
-          await provider.send("eth_requestAccounts", []);
+          // MetaMask
+          provider = window.ethereum;
+          await provider.request({ method: "eth_requestAccounts" });
         } else {
-          alert("Please use a browser with MetaMask or WalletConnect support.");
-          return;
+          // WalletConnect
+          provider = new WalletConnectProvider({ infuraId: "YOUR_INFURA_ID" }); // replace with your Infura ID
+          await provider.enable();
         }
 
-        const signer = await provider.getSigner();
-        const signature = await signer.signMessage(challenge);
+        const accounts = await provider.request({ method: "eth_accounts" });
+        const account = accounts[0];
 
-        document.getElementById("signature").innerText = "Signature created. Completing verification...";
-
-        // Send signature automatically via Discord /signature command
-        await fetch(`https://discord.com/api/v10/interactions/${userId}/commands/signature`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: signature })
+        // Sign the challenge
+        const signature = await provider.request({
+          method: "personal_sign",
+          params: [challenge, account]
         });
 
-        document.getElementById("status").innerText = "✅ Verification submitted. Role will be assigned automatically.";
+        status.innerText = "✅ Signature created! Submitting to bot...";
+
+        // Send signature to bot
+        const resp = await fetch(`/api/signature`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, signature })
+        });
+
+        const result = await resp.json();
+        if (result.success) {
+          status.innerText = "🎉 Verification complete! Role assigned. Private channel will be deleted shortly.";
+        } else {
+          status.innerText = "❌ Verification failed: " + (result.error || "Unknown error");
+        }
+
       } catch (err) {
         console.error(err);
-        alert(err.message);
+        status.innerText = "❌ Error: " + err.message;
       }
-    }
+    });
   </script>
 </body>
 </html>
