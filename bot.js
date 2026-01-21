@@ -2,7 +2,7 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const { Client, GatewayIntentBits, REST, Routes, PermissionsBitField, ChannelType, SlashCommandBuilder } = require("discord.js");
-const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const { ethers } = require("ethers");
 
 // ================== CONFIG ==================
@@ -10,24 +10,42 @@ const TOKEN = process.env.BOT_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const API_KEY = process.env.WHITELIST_API_KEY;
+const INFURA_KEY = process.env.INFURA_KEY;
 
-if (!TOKEN || !CLIENT_ID || !GUILD_ID || !API_KEY) {
-  console.error("BOT_TOKEN, CLIENT_ID, GUILD_ID, or WHITELIST_API_KEY not set");
+if (!TOKEN || !CLIENT_ID || !GUILD_ID || !API_KEY || !INFURA_KEY) {
+  console.error("BOT_TOKEN, CLIENT_ID, GUILD_ID, WHITELIST_API_KEY, or INFURA_KEY not set");
   process.exit(1);
 }
 
 const API_URL = "http://manifest.human.tech/api/covenant/signers-export";
 
-// ================== HTTP SERVER ==================
+// ================== EXPRESS SERVER ==================
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Serve public folder (HTML, JS, CSS)
 app.use(express.static(path.join(__dirname, "public")));
+
+// Endpoint to inject Infura key dynamically
+app.get("/signer.html", (req, res) => {
+  const filePath = path.join(__dirname, "public", "signer.html");
+  res.sendFile(filePath);
+});
+
+// Optional: provide the INFURA_KEY via endpoint for signer.html to fetch
+app.get("/config.json", (req, res) => {
+  res.json({ INFURA_KEY });
+});
+
+// Root check
 app.get("/", (req, res) => res.send("Bot running"));
+
+// Start server
 app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
 
 // ================== DISCORD CLIENT ==================
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
 
 // ========== COOLDOWN & CHALLENGES ==========
@@ -99,11 +117,10 @@ client.on("interactionCreate", async interaction => {
       return interaction.reply({ content: "❌ Wallet not found in whitelist.", ephemeral: true });
     }
 
-    // Must be SIGNED and VERIFIED
+    // Only proceed if SIGNED and VERIFIED
     if (entry.covenantStatus?.toUpperCase() !== "SIGNED") {
       return interaction.reply({ content: "❌ Wallet has not signed the covenant yet. Cannot proceed.", ephemeral: true });
     }
-
     if (entry.humanityStatus?.toUpperCase() !== "VERIFIED") {
       return interaction.reply({ content: "❌ Wallet has not been verified for humanity. Cannot proceed.", ephemeral: true });
     }
@@ -124,10 +141,11 @@ client.on("interactionCreate", async interaction => {
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Correct signer URL
-      const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
+      // Generate signer URL
+      const baseUrl = process.env.RENDER_EXTERNAL_URL || "https://signatory-role.onrender.com";
+      const signerUrl = `${baseUrl}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
-      // Send instructions in private channel
+      // Instructions in private channel
       await channel.send(`
 1️⃣ **Wallet Verification**
 
@@ -162,11 +180,11 @@ Submit your signature here:
         return interaction.reply({ content: "❌ Signature does not match provided wallet.", ephemeral: true });
       }
 
-      // Assign updated role
+      // Assign role
       const role = interaction.guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
       if (role) await interaction.member.roles.add(role);
 
-      await interaction.reply({ content: "✅ Verified! Role assigned.", ephemeral: true });
+      await interaction.reply({ content: "✅ Verification complete! Role assigned.", ephemeral: true });
 
       // Clean up
       challenges.delete(interaction.user.id);
