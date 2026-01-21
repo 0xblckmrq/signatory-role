@@ -52,7 +52,7 @@
 <body>
 
 <h2>🔐 human.tech Covenant Signatory Verification</h2>
-<p>Connect your wallet that you have used to sign the covenant.</p>
+<p>Connect the wallet used to sign the covenant.</p>
 
 <input type="text" id="msg" readonly />
 <button onclick="connectAndSign()">Connect Wallet & Sign</button>
@@ -117,9 +117,12 @@ async function connectAndSign() {
     sigBox.style.display = "block";
     sigBox.innerText = sig;
 
-    await navigator.clipboard.writeText(sig);
-
-    status.innerText = "✅ Signature copied. Paste it in Discord with /signature";
+    try {
+      await navigator.clipboard.writeText(sig);
+      status.innerText = "✅ Signature copied. Paste it in Discord with /signature";
+    } catch {
+      status.innerText = "✅ Signature generated. Copy it manually and paste it in Discord with /signature";
+    }
 
   } catch (err) {
     console.error(err);
