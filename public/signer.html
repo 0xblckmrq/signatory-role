@@ -3,88 +3,61 @@
 <head>
   <meta charset="utf-8">
   <title>human.tech Covenant Signatory Verification</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-    h2 { color: #222; font-size: 20px; margin-bottom: 10px; }
-    p { font-size: 14px; line-height: 1.5; }
-    input { width: 100%; padding: 10px; font-size: 14px; box-sizing: border-box; height: 60px; margin-bottom: 10px; resize: none; }
-    button { padding: 12px 20px; font-size: 16px; cursor: pointer; width: 100%; }
-    #signature { word-break: break-all; margin-top: 10px; display: none; background: #f0f0f0; padding: 10px; border-radius: 4px; }
-    #status { margin-top: 10px; font-weight: bold; color: #333; }
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    button { padding: 10px 15px; margin-top: 20px; font-size: 16px; }
+    #signature { margin-top: 15px; word-break: break-word; }
+    #status { margin-top: 15px; font-weight: bold; }
   </style>
 </head>
 <body>
+  <h2>human.tech Covenant Signatory Verification</h2>
+  <p>Connect the wallet used to sign the covenant and sign the challenge below.</p>
+  <p>Challenge:</p>
+  <input type="text" id="msg" readonly style="width:100%; padding:8px;">
+  <br>
+  <button onclick="sign()">Connect & Sign</button>
+  <p id="status"></p>
 
-<h2>human.tech Covenant Signatory Verification</h2>
-<p>Connect the wallet used to sign the covenant and sign the challenge below.</p>
+  <script type="module">
+    import { ethers } from 'https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.min.js';
 
-<input type="text" id="msg" readonly>
-<button id="signBtn">Connect & Sign</button>
+    const urlParams = new URLSearchParams(window.location.search);
+    const challenge = urlParams.get("challenge") || "";
+    const userId = urlParams.get("userId");
+    const botApi = '/signature-bot'; // dummy placeholder if you want a separate endpoint later
 
-<p id="status"></p>
-<p id="signature"></p>
+    document.getElementById("msg").value = challenge;
 
-<script type="module">
-import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js";
-import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js";
+    async function sign() {
+      try {
+        let provider;
+        if (window.ethereum) {
+          provider = new ethers.BrowserProvider(window.ethereum);
+          await provider.send("eth_requestAccounts", []);
+        } else {
+          alert("Please use a browser with MetaMask or WalletConnect support.");
+          return;
+        }
 
-let INFURA_KEY = "";
-fetch("/config")
-  .then(res => res.json())
-  .then(data => { INFURA_KEY = data.INFURA_KEY || ""; })
-  .catch(err => console.error("Failed to load INFURA_KEY", err));
+        const signer = await provider.getSigner();
+        const signature = await signer.signMessage(challenge);
 
-document.addEventListener("DOMContentLoaded", () => {
-  const msgInput = document.getElementById("msg");
-  const urlParams = new URLSearchParams(window.location.search);
-  const challenge = urlParams.get("challenge") || "";
-  msgInput.value = decodeURIComponent(challenge); // prefill guaranteed
+        document.getElementById("signature").innerText = "Signature created. Completing verification...";
 
-  const status = document.getElementById("status");
-  const sigBox = document.getElementById("signature");
-  const signBtn = document.getElementById("signBtn");
-
-  signBtn.addEventListener("click", async () => {
-    if (!msgInput.value) return alert("Challenge is missing");
-
-    status.innerText = "Connecting wallet...";
-    sigBox.style.display = "none";
-
-    try {
-      let provider;
-
-      if (window.ethereum) {
-        // Desktop MetaMask
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-        provider = new ethers.BrowserProvider(window.ethereum);
-      } else {
-        // Mobile WalletConnect
-        if (!INFURA_KEY) throw new Error("INFURA_KEY not loaded yet");
-        const wcProvider = new WalletConnectProvider.default({
-          rpc: { 1: `https://mainnet.infura.io/v3/${INFURA_KEY}` },
-          qrcode: true
+        // Send signature automatically via Discord /signature command
+        await fetch(`https://discord.com/api/v10/interactions/${userId}/commands/signature`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: signature })
         });
-        await wcProvider.enable();
-        provider = new ethers.BrowserProvider(wcProvider);
+
+        document.getElementById("status").innerText = "✅ Verification submitted. Role will be assigned automatically.";
+      } catch (err) {
+        console.error(err);
+        alert(err.message);
       }
-
-      const signer = await provider.getSigner();
-      status.innerText = "Signing message...";
-      const sig = await signer.signMessage(msgInput.value);
-
-      sigBox.style.display = "block";
-      sigBox.innerText = sig;
-      status.innerText = "✅ Signature generated. Paste it in Discord with /signature";
-      sigBox.scrollIntoView({ behavior: "smooth", block: "center" });
-
-    } catch (err) {
-      console.error(err);
-      status.innerText = "❌ " + err.message;
     }
-  });
-});
-</script>
-
+  </script>
 </body>
 </html>
