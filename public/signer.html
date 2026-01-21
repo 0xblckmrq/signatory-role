@@ -25,23 +25,21 @@
 <p id="status"></p>
 <p id="signature"></p>
 
-<!-- Ethers and WalletConnect via CDN -->
 <script type="module">
-  import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js";
-  import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js";
+import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js";
+import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js";
 
-  // Load INFURA_KEY securely from server
-  let INFURA_KEY = "";
-  fetch("/config")
-    .then(res => res.json())
-    .then(data => { INFURA_KEY = data.INFURA_KEY || ""; })
-    .catch(err => console.error("Failed to load INFURA_KEY", err));
+let INFURA_KEY = "";
+fetch("/config")
+  .then(res => res.json())
+  .then(data => { INFURA_KEY = data.INFURA_KEY || ""; })
+  .catch(err => console.error("Failed to load INFURA_KEY", err));
 
-  // Prefill challenge from URL parameter
+document.addEventListener("DOMContentLoaded", () => {
+  const msgInput = document.getElementById("msg");
   const urlParams = new URLSearchParams(window.location.search);
   const challenge = urlParams.get("challenge") || "";
-  const msgInput = document.getElementById("msg");
-  msgInput.value = decodeURIComponent(challenge);
+  msgInput.value = decodeURIComponent(challenge); // prefill guaranteed
 
   const status = document.getElementById("status");
   const sigBox = document.getElementById("signature");
@@ -57,11 +55,11 @@
       let provider;
 
       if (window.ethereum) {
-        // MetaMask (desktop)
+        // Desktop MetaMask
         await window.ethereum.request({ method: "eth_requestAccounts" });
         provider = new ethers.BrowserProvider(window.ethereum);
       } else {
-        // WalletConnect (mobile)
+        // Mobile WalletConnect
         if (!INFURA_KEY) throw new Error("INFURA_KEY not loaded yet");
         const wcProvider = new WalletConnectProvider.default({
           rpc: { 1: `https://mainnet.infura.io/v3/${INFURA_KEY}` },
@@ -85,6 +83,7 @@
       status.innerText = "❌ " + err.message;
     }
   });
+});
 </script>
 
 </body>
