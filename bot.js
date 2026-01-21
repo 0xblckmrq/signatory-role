@@ -23,7 +23,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => res.send("Bot running"));
-app.get("/config", (req, res) => res.json({ INFURA_KEY: process.env.INFURA_KEY }));
+app.get("/config", (req, res) => {
+  res.json({ INFURA_KEY: process.env.INFURA_KEY || "" });
+});
 app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
 
 // ================== DISCORD CLIENT ==================
@@ -123,7 +125,7 @@ client.on("interactionCreate", async interaction => {
 
       // Generate challenge
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
-      challenges.set(member.id, { challenge, wallet, channelId: channel.id });
+      challenges.set(member.id, { challenge, wallet });
 
       // Correct signer URL
       const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
@@ -135,7 +137,7 @@ client.on("interactionCreate", async interaction => {
 🔗 Click the signer page link:
 ${signerUrl}
 
-Connect your wallet and sign the message.
+Connect your wallet that you have used to sign the covenant and sign the message.
 
 Submit your signature here:
 /signature <paste_your_signature_here>
@@ -163,18 +165,17 @@ Submit your signature here:
         return interaction.reply({ content: "❌ Signature does not match provided wallet.", ephemeral: true });
       }
 
-      // Assign Covenant Verified Signatory role
+      // Assign role
       const role = interaction.guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
       if (role) await interaction.member.roles.add(role);
 
       await interaction.reply({ content: "✅ Verified! Role assigned.", ephemeral: true });
 
-      // Clean up challenge
+      // Clean up
       challenges.delete(interaction.user.id);
 
-      // Auto-delete the private channel after 5s
-      const channel = guild.channels.cache.get(data.channelId);
-      if (channel) setTimeout(() => channel.delete().catch(() => {}), 5000);
+      // Auto-delete channel after 5s
+      setTimeout(() => interaction.channel.delete(), 5000);
 
     } catch (err) {
       console.error(err);
