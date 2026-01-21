@@ -35,11 +35,11 @@
         let provider;
 
         if (window.ethereum) {
-          // MetaMask (desktop & mobile)
+          // MetaMask
           provider = window.ethereum;
           await provider.request({ method: "eth_requestAccounts" });
         } else {
-          // WalletConnect (mobile)
+          // WalletConnect
           provider = new WalletConnectProvider({
             rpc: { 1: "https://mainnet.infura.io/v3/84842078b09946638c03157f83405213" }
           });
