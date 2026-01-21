@@ -1,7 +1,15 @@
 require("dotenv").config();
 const path = require("path");
 const express = require("express");
-const { Client, GatewayIntentBits, REST, Routes, PermissionsBitField, ChannelType, SlashCommandBuilder } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  REST,
+  Routes,
+  PermissionsBitField,
+  ChannelType,
+  SlashCommandBuilder
+} = require("discord.js");
 const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const { ethers } = require("ethers");
 
@@ -132,13 +140,13 @@ client.on("interactionCreate", async interaction => {
       // Signer URL
       const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
-      // Send instructions in private channel with prefilled challenge
+      // Send instructions in private channel
       await channel.send(`
 1️⃣ **Wallet Verification**
 
-Your challenge is pre-filled in the signer page.
+Your challenge is **pre-filled** in the signer page.
 
-🔗 Click the signer page link to connect wallet and sign:
+🔗 Click the signer page link to connect your wallet and sign:
 ${signerUrl}
 
 After signing, submit your signature here:
