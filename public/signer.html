@@ -1,42 +1,90 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <title>Sign Message</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    input { width: 80%; padding: 8px; margin-bottom: 10px; }
-    button { padding: 8px 12px; }
-    #signature { margin-top: 10px; word-break: break-all; }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    input, button { padding: 8px; margin: 5px 0; width: 100%; max-width: 600px; }
+    button { cursor: pointer; }
+    p { word-break: break-all; }
   </style>
 </head>
 <body>
   <h2>Sign Your Bot Message</h2>
-  <p>Challenge message (auto-filled from URL):</p>
-  <input type="text" id="msg" readonly>
-  <br>
-  <button onclick="sign()">Sign Message</button>
+
+  <input type="text" id="msg" placeholder="Challenge will populate automatically" readonly>
+  <button id="signBtn">Connect Wallet & Sign</button>
   <p id="signature"></p>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const challenge = urlParams.get("challenge") || "";
-    document.getElementById("msg").value = challenge;
+    let provider;
+    let signer;
+    let INFURA_KEY;
 
-    async function sign() {
-      if (!window.ethereum) return alert("MetaMask not detected");
-      const [account] = await ethereum.request({ method: "eth_requestAccounts" });
-      const msg = document.getElementById("msg").value;
+    // 1️⃣ Fetch Infura key from backend
+    async function fetchConfig() {
       try {
-        const sig = await ethereum.request({
-          method: "personal_sign",
-          params: [msg, account]
-        });
-        document.getElementById("signature").innerText = sig;
-      } catch(e) {
-        alert(e.message);
+        const res = await fetch("/config.json");
+        const config = await res.json();
+        INFURA_KEY = config.INFURA_KEY;
+      } catch (err) {
+        console.error(err);
+        alert("Failed to load configuration. Contact admin.");
       }
     }
+
+    // 2️⃣ Auto-populate challenge from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const challenge = urlParams.get('challenge') || '';
+    document.getElementById('msg').value = challenge;
+
+    // 3️⃣ Connect wallet
+    async function connectWallet() {
+      if (provider && signer) return;
+
+      // Try injected wallet (MetaMask)
+      if (window.ethereum) {
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        return;
+      }
+
+      // Fallback to WalletConnect
+      if (!INFURA_KEY) throw new Error("INFURA_KEY missing");
+      const wcProvider = new WalletConnectProvider.default({
+        rpc: { 1: `https://mainnet.infura.io/v3/${INFURA_KEY}` }
+      });
+      await wcProvider.enable();
+      provider = new ethers.BrowserProvider(wcProvider);
+      signer = await provider.getSigner();
+    }
+
+    // 4️⃣ Sign the challenge
+    document.getElementById('signBtn').onclick = async function() {
+      try {
+        if (!challenge) throw new Error("Challenge not found in URL");
+        await connectWallet();
+        const signature = await signer.signMessage(challenge);
+        document.getElementById("signature").innerText = signature;
+
+        // Auto-select text for easy copy
+        const range = document.createRange();
+        range.selectNode(document.getElementById("signature"));
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+
+      } catch (err) {
+        console.error(err);
+        alert(err.message);
+      }
+    };
+
+    // Initialize
+    fetchConfig();
   </script>
 </body>
 </html>
