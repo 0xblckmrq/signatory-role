@@ -94,9 +94,12 @@ async function connectAndSign() {
       provider = new window.ethers.BrowserProvider(window.ethereum);
     } else {
       const wcProvider = new WalletConnectProvider.default({
-        infuraId: window.INFURA_KEY,
-        qrcode: true
-      });
+  rpc: {
+    1: `https://mainnet.infura.io/v3/${window.INFURA_KEY}`  // Ethereum Mainnet
+  },
+  qrcode: true
+});
+
       await wcProvider.enable();
       provider = new window.ethers.BrowserProvider(wcProvider);
     }
