@@ -38,7 +38,7 @@ const challenges = new Map();
 const cooldowns = new Map();
 const COOLDOWN_SECONDS = 300; // 5 minutes
 
-// ---------------- REGISTER SLASH COMMANDS ----------------
+// ---------------- REGISTER SLASH COMMAND ----------------
 (async () => {
   const commands = [
     new SlashCommandBuilder()
@@ -68,6 +68,18 @@ client.on("interactionCreate", async interaction => {
     const userId = interaction.user.id;
     const guild = interaction.guild;
     const member = interaction.member;
+
+    // Already verified check
+    const role = guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
+    if (role && member.roles.cache.has(role.id)) {
+      const msg = "✅ You are already verified with the Covenant Verified Signatory role.";
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: msg, ephemeral: true });
+      } else {
+        await interaction.reply({ content: msg, ephemeral: true });
+      }
+      return;
+    }
 
     // Cooldown
     const last = cooldowns.get(userId) || 0;
