@@ -6,11 +6,16 @@
 <title>human.tech Covenant Signatory Verification</title>
 <style>
   body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-  h2 { color: #222; }
-  input { width: 100%; padding: 8px; margin: 10px 0; font-size: 14px; }
-  button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-  #signature { word-break: break-all; margin-top: 10px; display: none; background: #f0f0f0; padding: 8px; border-radius: 4px; }
-  #status { margin-top: 10px; font-weight: bold; }
+  h2 { color: #222; font-size: 20px; margin-bottom: 10px; }
+  p { font-size: 14px; line-height: 1.5; }
+  input { width: 100%; padding: 10px; margin: 10px 0; font-size: 14px; box-sizing: border-box; }
+  button { padding: 12px 20px; font-size: 16px; cursor: pointer; margin-bottom: 10px; }
+  #signature { word-break: break-all; margin-top: 10px; display: none; background: #f0f0f0; padding: 10px; border-radius: 4px; }
+  #status { margin-top: 10px; font-weight: bold; color: #333; }
+  @media (max-width: 500px) {
+    body { padding: 10px; }
+    button { width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -28,12 +33,14 @@
 import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.min.js";
 import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js";
 
+// Load INFURA_KEY from /config
 let INFURA_KEY = "";
 fetch("/config")
   .then(res => res.json())
   .then(data => { INFURA_KEY = data.INFURA_KEY; })
   .catch(err => console.error("Failed to load INFURA_KEY", err));
 
+// Auto-fill challenge from URL query
 window.addEventListener("DOMContentLoaded", () => {
   const urlParams = new URLSearchParams(window.location.search);
   const challengeParam = urlParams.get("challenge");
@@ -46,6 +53,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+// Connect & sign button
 document.getElementById("signBtn").addEventListener("click", async () => {
   const status = document.getElementById("status");
   const sigBox = document.getElementById("signature");
@@ -87,7 +95,6 @@ document.getElementById("signBtn").addEventListener("click", async () => {
       status.innerText = "✅ Signature generated. Copy it manually and paste in Discord with /signature";
     }
 
-    // Scroll signature into view for mobile
     sigBox.scrollIntoView({ behavior: "smooth", block: "center" });
 
   } catch (err) {
