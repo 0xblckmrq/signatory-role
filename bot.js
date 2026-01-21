@@ -2,8 +2,8 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const { Client, GatewayIntentBits, REST, Routes, PermissionsBitField, ChannelType, SlashCommandBuilder } = require("discord.js");
-const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
-const { verifyMessage } = require("ethers"); // updated for Ethers v6
+const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
+const { ethers } = require("ethers");
 
 // ================== CONFIG ==================
 const TOKEN = process.env.BOT_TOKEN;
@@ -23,6 +23,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => res.send("Bot running"));
+app.get("/config", (req, res) => res.json({ INFURA_KEY: process.env.INFURA_KEY }));
 app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
 
 // ================== DISCORD CLIENT ==================
@@ -122,7 +123,7 @@ client.on("interactionCreate", async interaction => {
 
       // Generate challenge
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
-      challenges.set(member.id, { challenge, wallet });
+      challenges.set(member.id, { challenge, wallet, channelId: channel.id });
 
       // Correct signer URL
       const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
@@ -157,22 +158,23 @@ Submit your signature here:
 
     try {
       // Recover wallet from signature
-      const recovered = verifyMessage(data.challenge, sig); // Ethers v6
+      const recovered = ethers.verifyMessage(data.challenge, sig);
       if (recovered.toLowerCase() !== data.wallet.toLowerCase()) {
         return interaction.reply({ content: "❌ Signature does not match provided wallet.", ephemeral: true });
       }
 
-      // Assign role
+      // Assign Covenant Verified Signatory role
       const role = interaction.guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
       if (role) await interaction.member.roles.add(role);
 
       await interaction.reply({ content: "✅ Verified! Role assigned.", ephemeral: true });
 
-      // Clean up
+      // Clean up challenge
       challenges.delete(interaction.user.id);
 
-      // Auto-delete channel after 5s
-      setTimeout(() => interaction.channel.delete(), 5000);
+      // Auto-delete the private channel after 5s
+      const channel = guild.channels.cache.get(data.channelId);
+      if (channel) setTimeout(() => channel.delete().catch(() => {}), 5000);
 
     } catch (err) {
       console.error(err);
