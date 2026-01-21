@@ -23,9 +23,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
 
-// Serve INFURA_KEY securely to signer page
+// Provide INFURA_KEY to signer.html via /config
 app.get("/config", (req, res) => {
-  res.json({ INFURA_KEY: process.env.INFURA_KEY });
+  res.json({ INFURA_KEY: process.env.INFURA_KEY || "" });
 });
 
 app.get("/", (req, res) => res.send("Bot running"));
@@ -101,13 +101,18 @@ client.on("interactionCreate", async interaction => {
     const list = await fetchWhitelist();
     const entry = list.find(w => w.walletAddress?.toLowerCase() === wallet);
 
-    if (!entry) return interaction.reply({ content: "❌ Wallet not found in whitelist.", ephemeral: true });
+    if (!entry) {
+      return interaction.reply({ content: "❌ Wallet not found in whitelist.", ephemeral: true });
+    }
 
-    if (entry.covenantStatus?.toUpperCase() !== "SIGNED")
+    // Must be SIGNED and VERIFIED
+    if (entry.covenantStatus?.toUpperCase() !== "SIGNED") {
       return interaction.reply({ content: "❌ Wallet has not signed the covenant yet. Cannot proceed.", ephemeral: true });
+    }
 
-    if (entry.humanityStatus?.toUpperCase() !== "VERIFIED")
+    if (entry.humanityStatus?.toUpperCase() !== "VERIFIED") {
       return interaction.reply({ content: "❌ Wallet has not been verified for humanity. Cannot proceed.", ephemeral: true });
+    }
 
     try {
       // Create private verification channel
@@ -125,20 +130,20 @@ client.on("interactionCreate", async interaction => {
       const challenge = `Verify ownership for ${wallet} at ${Date.now()}`;
       challenges.set(member.id, { challenge, wallet });
 
-      // Correct signer URL (challenge auto-filled)
-      const baseUrl = process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "");
-      const signerUrl = `${baseUrl}/signer.html?challenge=${encodeURIComponent(challenge)}`;
+      // Signer URL
+      const signerUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "")}/signer.html?challenge=${encodeURIComponent(challenge)}`;
 
-      // Send instructions in private channel
+      // Send instructions in private channel with prefilled challenge text
       await channel.send(`
-1️⃣ **human.tech Covenant Signatory Verification**
+1️⃣ **Wallet Verification**
 
-🔗 Click the signer page link:
+Your challenge is auto-filled here:
+\`${challenge}\`
+
+🔗 Click the signer page link to connect wallet and sign:
 ${signerUrl}
 
-Connect the wallet used to sign the covenant and sign the challenge. The challenge is pre-filled for you.
-
-Submit your signature here:
+After signing, submit your signature here:
 /signature <paste_your_signature_here>
       `);
 
@@ -158,11 +163,13 @@ Submit your signature here:
     if (!data) return interaction.reply({ content: "❌ No active verification.", ephemeral: true });
 
     try {
+      // Recover wallet from signature
       const recovered = ethers.verifyMessage(data.challenge, sig);
-      if (recovered.toLowerCase() !== data.wallet.toLowerCase())
+      if (recovered.toLowerCase() !== data.wallet.toLowerCase()) {
         return interaction.reply({ content: "❌ Signature does not match provided wallet.", ephemeral: true });
+      }
 
-      // Assign updated role
+      // Assign role
       const role = interaction.guild.roles.cache.find(r => r.name === "Covenant Verified Signatory");
       if (role) await interaction.member.roles.add(role);
 
